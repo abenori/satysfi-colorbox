@@ -1,0 +1,7 @@
+@require: stdjareport
+
+document (|
+  title = {};
+  author = {;
+|) '<
+>

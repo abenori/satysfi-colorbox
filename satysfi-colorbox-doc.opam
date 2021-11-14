@@ -1,0 +1,35 @@
+opam-version: "2.0"
+name: "satysfi-colorbox-doc"
+version: "1.0.0"
+synopsis: "Document of Colorbox"
+description: """
+"""
+maintainer: "Noriyuki Abe"
+authors: "Noriyuki Abe"
+license: "BSD-2-Clause-Views"
+homepage: "https://github.com/abenori/satysfi-colorbox"
+dev-repo: "git+https://github.com/abenori/satysfi-colorbox.git"
+bug-reports: "https://github.com/abenori/satysfi-colorbox/issues"
+depends: [
+  "satysfi" { >= "0.0.5" & < "0.0.6" }
+  "satyrographos" { >= "0.0.2.6" & < "0.0.3" }
+
+  # You may want to include the corresponding library
+  "satysfi-satysfi-colorbox" {= "%{version}%"}
+
+  # Other libraries
+  "satysfi-dist"
+  "satysfi-base"
+]
+build: [
+  ["satyrographos" "opam" "build"
+   "--name" "satysfi-colorbox-doc"
+   "--prefix" "%{prefix}%"
+   "--script" "%{build}%/Satyristes"]
+]
+install: [
+  ["satyrographos" "opam" "install"
+   "--name" "satysfi-colorbox-doc"
+   "--prefix" "%{prefix}%"
+   "--script" "%{build}%/Satyristes"]
+]

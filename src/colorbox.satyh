@@ -1,0 +1,219 @@
+@require: list
+@require: color
+@require: base/list-ext
+@require: base/length
+@require: base/float
+@require: fss/style
+@require: fss/fss
+
+type colorbox-line-config = (|
+  color: color;
+  thickness: length;
+|)
+
+type colorbox-path = (length*length) -> (
+  (pre-path -> pre-path) * % 反時計回り
+  (length*length)*% start
+  (length*length)% end
+)
+
+type colorbox-config = (|
+  left-skip: length;
+  right-skip: length;
+  before-skip: length;
+  after-skip: length;
+  left: length;
+  right: length;
+  top: length;
+  bottom: length;
+  boxsep: length;
+  boxrule: length;
+  corner-graphics: (|
+    left-top: colorbox-path;
+    right-top: colorbox-path;
+    left-bottom: colorbox-path;
+    right-bottom: colorbox-path;
+  |);
+  color-back: color;
+  color-frame: color;
+  title: inline-text;
+  top-title: length;
+  bottom-title: length;
+  left-title: length;
+  right-title: length;
+  fonttitle: style list;
+  color-title: color;
+  color-back-title: color;
+  title: inline-text;
+|)
+
+type colorbox-title-graphics = (|
+  graphics: colorbox-config -> context -> (length*length) -> length -> length -> length -> inline-boxes -> (graphics list);
+  shifts: colorbox-config -> context -> inline-boxes -> (length * length); % 枠自身のずらし，さらに本文のずらし
+|)
+module Colorbox : sig
+  val colorbox-scheme: colorbox-title-graphics -> colorbox-config -> context -> block-text -> block-boxes
+  val default-config: colorbox-config
+  val default-title-graphics: colorbox-title-graphics
+end = struct
+
+let len-to-str l = Float.to-string (Length.to-float l) ^ `pt`
+let colorbox-scheme title-gr config ctx txt =
+  let line-config = (|
+    color = config#color-frame;
+    thickness = config#boxrule;
+  |) in
+  let title-it = config#title in
+  let title-ib = read-inline (ctx |> set-text-color config#color-title) {\font-style (config#fonttitle) {#title-it;}} in
+  let (title-w,title-h,title-d) = get-natural-metrics title-ib in
+  let is-title-available = if Length.(title-w == 0pt) then false else true in
+  let (frame-shift,body-shift) =
+    if is-title-available then title-gr#shifts config ctx title-ib
+    else (0pt,0pt)
+  in
+  let null-deco _ _ _ _ = [] in
+  let null-decos = (null-deco,null-deco,null-deco,null-deco) in
+  let paddings = (
+    config#left +' config#boxsep,
+    config#right +' config#boxsep,
+    config#top +' frame-shift +' body-shift +' config#boxsep,
+    config#bottom +' config#boxsep
+  ) in
+  let deco-top-path (x,y) width height depth =
+    let (lt-path,lt-r,lt-b) = config#corner-graphics#left-top (x,y +' height) in
+    let (rt-path,rt-b,rt-l) = config#corner-graphics#right-top (x +' width,y +' height) in
+    let path p = p |> rt-path |> line-to lt-r |> lt-path in
+    (rt-b,lt-b,path)
+  in
+  let deco-bottom-path (x,y) width height depth =
+    let (lb-path,lb-t,lb-r) = config#corner-graphics#left-bottom (x,y -' depth) in
+    let (rb-path,rb-l,rb-t) = config#corner-graphics#right-bottom (x +' width,y -' depth) in
+    let path p = p |> lb-path |> line-to rb-l |> rb-path  in
+    (lb-t,rb-t,path)
+  in
+  let deco-ro pt width height depth =
+    let (rt,lt,t-path) = deco-top-path pt width height depth in
+    let (lb,rb,b-path) = deco-bottom-path pt width height depth in
+    let gr = stroke line-config#thickness line-config#color (
+      start-path rb |> line-to rt |> t-path |> line-to lb |> b-path |> close-with-line
+    ) in
+    if is-title-available then
+      List.append [gr;] (title-gr#graphics config ctx pt width height depth title-ib)
+    else [gr;]
+  in
+  let deco-dougamae (x,y) width height depth = 
+    let (rt,lt,t-path) = deco-top-path (x,y) width height depth in
+    let gr = stroke line-config#thickness line-config#color (
+      start-path (x +' width, y -' depth) |> line-to rt |> t-path |> line-to (x,y -' depth) |> terminate-path
+    ) in
+    if is-title-available then
+      List.append [gr;] (title-gr#graphics config ctx (x,y) width height depth title-ib)
+    else [gr;]
+  in
+  let deco-ukebako (x,y) width height depth =
+    let (lb,rb,b-path) = deco-bottom-path (x,y) width height depth in
+    [
+      stroke line-config#thickness line-config#color (
+        start-path (x,y +' height) |> line-to lb |> b-path |> line-to (x +' width,y +' height) |> terminate-path
+      );
+    ]
+  in
+  let deco-tate2bou (x,y) width height depth = 
+    [
+      stroke line-config#thickness line-config#color (start-path (x,y +' height) |> line-to (x,y -' depth) |> terminate-path);
+      stroke line-config#thickness line-config#color (start-path (x +' width,y +' height) |> line-to (x +' width,y -' depth) |> terminate-path);
+    ]
+  in
+  (
+    (
+      block-frame-breakable ctx (config#left-skip,config#right-skip,config#before-skip,config#after-skip) null-decos (fun c -> (
+      block-frame-breakable c
+        paddings
+        (deco-ro,deco-dougamae,deco-tate2bou,deco-ukebako)
+        (fun inctx -> (read-block inctx txt))
+      ))
+    )
+  )
+
+  let null-corner pt = ((fun p -> p),pt,pt)
+  let quarter-circle angle radius (x,y) =
+    let (c,s) = (cos (angle *. 3.14159 /. 180.0),sin (angle *. 3.14159 /. 180.0)) in
+    let (stx,sty) = (x +' (radius *' c),y +' (radius *' s)) in
+    let (enx,eny) = (x -' (radius *' s),y +' (radius *' c)) in
+    let ctrl = radius *' 0.55228 in
+    (
+      (fun p -> (p
+        |> bezier-to (stx -' (ctrl *' s),sty +' (ctrl *' c)) (enx +' (ctrl *' c),eny +' (ctrl *' s)) (enx,eny)
+      )),
+      (stx,sty),(enx,eny)
+    )
+  let circle-corner radius = (|
+    right-top = (fun (x,y) -> quarter-circle 0.0 radius (x -' radius,y -' radius));
+    left-top = (fun (x,y) -> quarter-circle 90.0 radius (x +' radius,y -' radius));
+    left-bottom = (fun (x,y) -> quarter-circle 180.0 radius (x +' radius,y +' radius));
+    right-bottom = (fun (x,y) -> quarter-circle 270.0 radius (x -' radius,y +' radius));
+  |)
+
+%  graphics = colorbox-config -> (length*length) -> length -> length -> length -> inline-boxes -> (graphics list);
+%  shifts =  colorbox-config -> inline-boxes -> (length * length); % 枠自身のずらし，さらに本文のずらし
+  let default-title-graphics-titlebb ctx config title-ib =
+    let null-deco _ _ _ _ = [] in
+    let null-decos = (null-deco,null-deco,null-deco,null-deco) in
+    block-frame-breakable ctx (
+      config#left +' config#left-title +' config#boxsep,config#right +' config#right-title +' config#boxsep,
+      config#top-title +' config#boxsep, config#bottom-title +' config#boxsep
+    ) null-decos (fun inctx -> (
+      line-break false false inctx (title-ib ++ inline-fil)
+    ))
+  let default-title-graphics-shifts config ctx title-ib = (0pt,get-natural-length (default-title-graphics-titlebb ctx config title-ib))
+  let default-title-graphics-f config ctx (x,y) width height depth title-ib =
+    let title-ib-from-bb = 
+      (inline-skip (0pt -' config#left)) ++
+      embed-block-breakable ctx (default-title-graphics-titlebb  ctx config title-ib)
+    in
+    let (title-w,title-h,title-d) = get-natural-metrics title-ib-from-bb in
+    let shift = title-h +' title-d in
+    let (lt,rt,top-path) = 
+      let (lt-path,lt-r,lt-b) = config#corner-graphics#left-top (x,y +' height) in
+      let (rt-path,rt-b,rt-l) = config#corner-graphics#right-top (x +' width,y +' height) in
+      (lt-b,rt-b,(fun p -> (p |> rt-path |> line-to lt-r |> lt-path)))
+    in
+    [
+      fill config#color-back-title (
+        start-path (x +' width,y +' height -' (title-h +' title-d)) |> line-to rt |> top-path |> line-to (x,y +' height -' (title-h +' title-d)) |> close-with-line
+      );
+      draw-text (x +' config#left,y +' height -' title-h) title-ib-from-bb;
+    ]
+  
+  let default-title-graphics = (|
+    graphics = default-title-graphics-f;
+    shifts = default-title-graphics-shifts;
+  |)
+  
+  let default-config = (|
+    left-skip = 0pt;
+    right-skip = 0pt;
+    before-skip = 0pt;
+    after-skip = 0pt;
+    left = 4mm;
+    right = 4mm;
+    top = 2mm;
+    bottom = 2mm;
+    top-title = 0pt;
+    bottom-title = 0pt;
+    left-title = 0pt;
+    right-title = 0pt;
+    fonttitle = [];
+    color-title = Color.white;
+    boxsep = 1mm;
+    boxrule = 0.5mm;
+    corner-graphics = circle-corner 5pt;
+    color-back = Color.white;
+    color-frame = (Color.gray 0.2);
+    color-back-title = (Color.gray 0.2);
+    title = {};
+  |)
+
+
+end
+
