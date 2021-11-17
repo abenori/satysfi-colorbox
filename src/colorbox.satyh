@@ -17,7 +17,7 @@ type colorbox-corner-path = (length*length) -> (
   (pre-path -> pre-path) * % 反時計回り
   (graphics list)
 )
-type colorbox-frame = (|
+type colorbox-frame-path = (|
   left-top: colorbox-corner-path;
   right-top: colorbox-corner-path;
   left-bottom: colorbox-corner-path;
@@ -27,7 +27,6 @@ type colorbox-frame = (|
   left-rule: (length*length) -> (length*length) -> (pre-path -> pre-path);
   right-rule: (length*length) -> (length*length) -> (pre-path -> pre-path);
 |)
-
 
 type colorbox-config = (|
   left-skip: length;
@@ -40,9 +39,21 @@ type colorbox-config = (|
   bottom: length;
   boxsep: length;
   boxrule: length;
-  color-frame: color;
+  frame-path: colorbox-frame-path;
   color-back: color;
 |)
+
+type colorbox-frame-graphic = (|
+  left-top: colorbox-config -> path -> graphics list;
+  right-top: colorbox-config -> path -> graphics list;
+  left-bottom: colorbox-config -> path -> graphics list;
+  right-bottom: colorbox-config -> path -> graphics list;
+  top-rule: colorbox-config -> path -> graphics list;
+  bottom-rule: colorbox-config -> path -> graphics list;
+  left-rule: colorbox-config -> path -> graphics list;
+  right-rule: colorbox-config -> path -> graphics list;
+|)
+
 
 type colorbox-title = (|
   make-box: colorbox-config -> context -> inline-text -> inline-boxes;
@@ -50,34 +61,38 @@ type colorbox-title = (|
   shifts: colorbox-config ->  context -> inline-boxes -> (length * length); % 枠自身のずらし，さらに本文のずらし
 |)
 
-type colorbox-normal-title-config = (|
-  frame: colorbox-frame;
-  top-title: length;
-  bottom-title: length;
-  left-title: length;
-  right-title: length;
-  fonttitle: style list;
-  color-title: color;
-  color-back-title: color;
-|)
-
 module Colorbox : sig
-  val colorbox-scheme: colorbox-config -> colorbox-frame -> colorbox-title -> context -> inline-text ?-> block-text -> block-boxes
+  val colorbox-scheme: colorbox-config -> colorbox-frame-graphic -> colorbox-title -> context -> inline-text ?-> block-text -> block-boxes
   val default-config: colorbox-config
-  val normal-frame: colorbox-frame
-  val circle-frame: length -> colorbox-frame
-  val normal-title: colorbox-normal-title-config -> colorbox-title
-  val normal-title-default-config: colorbox-normal-title-config
+  val normal-frame: colorbox-frame-path
+  val circle-frame: length -> colorbox-frame-path
+  val stroke-frame: (|
+    boxrule: length;
+    color: color;
+  |) -> colorbox-frame-graphic
+  val normal-title: (|
+    frame: colorbox-frame-path;
+    top: length;
+    bottom: length;
+    left: length;
+    right: length;
+    fonttitle: style list;
+    color: color;
+    color-back: color;
+  |) -> colorbox-title
 
   val boxed-title: (|
-    frame: colorbox-frame;
-    top-title: length;
-    bottom-title: length;
-    left-title: length;
-    right-title: length;
+    boxrule: length;
+    frame: colorbox-frame-path;
+    top: length;
+    bottom: length;
+    left: length;
+    right: length;
     fonttitle: style list;
-    color-title: color;
-    color-back-title: color;
+    color: color;
+    color-back: color;
+    color-frame: color;
+    shift: (length*length);
   |) -> colorbox-title
 end = struct
 
@@ -96,63 +111,92 @@ let colorbox-scheme config frame-scheme title-scheme ctx ?:title-txt txt =
   let paddings = (
     config#left +' config#boxsep,
     config#right +' config#boxsep,
-    config#top +' frame-shift +' body-shift +' config#boxsep,
+    config#top +' config#boxsep,
     config#bottom +' config#boxsep
   ) in
   let deco-top-path (x,y) width height depth =
-    let (lt-r,lt-b,lt-path,lt-gr) = frame-scheme#left-top (x,y +' height -' frame-shift) in
-    let (rt-b,rt-l,rt-path,rt-gr) = frame-scheme#right-top (x +' width,y +' height -' frame-shift) in
-    let path p = p |> rt-path |> (frame-scheme#top-rule rt-l lt-r) |> lt-path in
-    (rt-b,lt-b,path,(List.append lt-gr rt-gr))
+    let (lt-r,lt-b,lt-path,lt-gr-ex) = config#frame-path#left-top (x,y +' height +' frame-shift) in
+    let (rt-b,rt-l,rt-path,rt-gr-ex) = config#frame-path#right-top (x +' width,y +' height +' frame-shift) in
+    let top-path = config#frame-path#top-rule rt-l lt-r in
+    let path p = p |> rt-path |>  top-path |> lt-path in
+    let lt-gr = frame-scheme#left-top config (start-path lt-r |> lt-path |> terminate-path) in
+    let t-gr = frame-scheme#top-rule config (start-path rt-l |> top-path |> terminate-path) in
+    let rt-gr = frame-scheme#right-top config (start-path rt-b |> rt-path |> terminate-path) in
+    (rt-b,lt-b,path,(List.concat [rt-gr;t-gr;lt-gr]),(List.append lt-gr-ex rt-gr-ex))
   in
   let deco-bottom-path (x,y) width height depth =
-    let (lb-t,lb-r,lb-path,lb-gr) = frame-scheme#left-bottom (x,y -' depth) in
-    let (rb-l,rb-t,rb-path,rb-gr) = frame-scheme#right-bottom (x +' width,y -' depth) in
-    let path p = p |> lb-path |> (frame-scheme#bottom-rule lb-r rb-l) |> rb-path  in
-    (lb-t,rb-t,path,(List.append lb-gr rb-gr))
+    let (lb-t,lb-r,lb-path,lb-gr-ex) = config#frame-path#left-bottom (x,y -' depth) in
+    let (rb-l,rb-t,rb-path,rb-gr-ex) = config#frame-path#right-bottom (x +' width,y -' depth) in
+    let b-path = config#frame-path#bottom-rule lb-r rb-l in
+    let lb-gr = frame-scheme#left-bottom config (start-path lb-t |> lb-path |> terminate-path) in
+    let b-gr = frame-scheme#bottom-rule config (start-path lb-r |> b-path |> terminate-path) in
+    let rb-gr = frame-scheme#right-bottom config (start-path rb-l |> rb-path |> terminate-path) in
+    let path p = p |> lb-path |> b-path |> rb-path  in
+    (lb-t,rb-t,path,(List.concat [lb-gr;b-gr;rb-gr]),(List.append lb-gr-ex rb-gr-ex))
   in
   let deco-ro pt width height depth =
-    let (rt,lt,t-path,t-gr) = deco-top-path pt width height depth in
-    let (lb,rb,b-path,b-gr) = deco-bottom-path pt width height depth in
-    let gr = stroke config#boxrule config#color-frame (
-      start-path rb |> (frame-scheme#right-rule rb rt) |> t-path |> (frame-scheme#left-rule lt lb) |> b-path |> close-with-line
-    ) in
+    let (rt,lt,t-path,t-gr,t-gr-ex) = deco-top-path pt width height depth in
+    let (lb,rb,b-path,b-gr,b-gr-ex) = deco-bottom-path pt width height depth in
+    let r-path = config#frame-path#right-rule rb rt in
+    let l-path = config#frame-path#left-rule lt lb in
+    let l-gr = frame-scheme#left-rule config (start-path lt |> l-path |> terminate-path) in
+    let r-gr = frame-scheme#right-rule config (start-path rb |> r-path |> terminate-path) in
+    let back-gr = [fill config#color-back (start-path rt |> t-path |> l-path |> b-path |> r-path |> close-with-line)] in
+    let gr = List.concat [back-gr;t-gr;l-gr;b-gr;r-gr;t-gr-ex;b-gr-ex] in
     if is-title-available then
-      List.append (List.append (List.append [gr;] (title-scheme#graphics config ctx pt width height depth title-ib)) t-gr) b-gr
-    else [gr;]
+      let title-gr = title-scheme#graphics config ctx pt width height depth title-ib in
+      List.append gr title-gr
+    else gr
   in
   let deco-dougamae (x,y) width height depth = 
-    let (rt,lt,t-path,t-gr) = deco-top-path (x,y) width height depth in
-    let gr = stroke config#boxrule config#color-frame (
-      start-path (x +' width, y -' depth) |> (frame-scheme#right-rule (x +' width, y -' depth) rt) |> t-path
-       |> (frame-scheme#left-rule lt (x,y -' depth)) |> terminate-path
-    ) in
+    let (rt,lt,t-path,t-gr,t-gr-ex) = deco-top-path (x,y) width height depth in
+    let l-path = config#frame-path#left-rule lt (x,y -' depth) in
+    let l-gr = frame-scheme#left-rule config (start-path lt |> l-path |> terminate-path) in
+    let r-path = config#frame-path#right-rule (x +' width, y -' depth) rt in
+    let r-gr = frame-scheme#right-rule config (start-path (x +' width, y -' depth) |> r-path |> terminate-path )in
+    let back-gr = [fill config#color-back (start-path (x +' width, y -' depth) |> r-path |> t-path |> l-path |> close-with-line)] in
+    let gr = List.concat [back-gr;r-gr;t-gr;l-gr;t-gr-ex] in
     if is-title-available then
-      List.append (List.append [gr;] (title-scheme#graphics config ctx (x,y) width height depth title-ib)) t-gr
-    else [gr;]
+      let title-gr = title-scheme#graphics config ctx (x,y) width height depth title-ib in
+      List.append gr title-gr
+    else gr
   in
   let deco-ukebako (x,y) width height depth =
-    let (lb,rb,b-path,b-gr) = deco-bottom-path (x,y) width height depth in
-    List.append [
-      stroke config#boxrule config#color-frame (
-        start-path (x,y +' height) |> (frame-scheme#left-rule (x,y +' height) lb) |> b-path
-          |> (frame-scheme#right-rule rb (x +' width,y +' height)) |> terminate-path
-      );
-    ] b-gr
+    let (lb,rb,b-path,b-gr,b-gr-ex) = deco-bottom-path (x,y) width height depth in
+    let l-path = config#frame-path#left-rule (x,y +' height) lb in
+    let r-path = config#frame-path#right-rule rb (x +' width,y +' height) in
+    let l-gr = frame-scheme#left-rule config (start-path (x,y +' height) |> l-path |> terminate-path) in
+    let r-gr = frame-scheme#right-rule config (start-path rb |> r-path |> terminate-path) in
+    let back-gr = [fill config#color-back (start-path (x, y +' height) |> l-path |> b-path |> r-path |> close-with-line)] in
+    List.concat [back-gr;l-gr;b-gr;r-gr;b-gr-ex]
   in
   let deco-tate2bou (x,y) width height depth = 
-    [
-      stroke config#boxrule config#color-frame (start-path (x,y +' height) |> (frame-scheme#left-rule (x,y +' height) (x,y -' depth)) |> terminate-path);
-      stroke config#boxrule config#color-frame (start-path (x +' width,y +' height) |> (frame-scheme#right-rule (x +' width,y +' height) (x +' width,y -' depth)) |> terminate-path);
+    let l-path = config#frame-path#left-rule (x,y +' height) (x,y -' depth) in
+    let r-path = config#frame-path#right-rule (x +' width,y -' depth) (x +' width,y +' height) in
+    let back-gr = [fill config#color-back (start-path (x +' width, y -' depth) |> r-path |> line-to (x,y +' height) |> l-path |> close-with-line);] in
+    List.concat [
+      back-gr;
+      frame-scheme#left-rule config (start-path (x,y +' height) |> l-path |> terminate-path);
+      frame-scheme#right-rule config (start-path (x +' width,y -' depth) |> r-path |> terminate-path);
     ]
   in
+  let large-skip = 10000pt in
+  let empty-inline-bb = inline-graphics 10pt 10pt 10pt (fun pt -> []) in
+  let dummy-txt = line-break false false (set-paragraph-margin 0pt 0pt ctx) (empty-inline-bb ++ inline-fil) in
+  let dummy-len = get-natural-length dummy-txt in
   (
     (
       block-frame-breakable ctx (config#left-skip,config#right-skip,config#before-skip,config#after-skip) null-decos (fun c -> (
       block-frame-breakable c
         paddings
         (deco-ro,deco-dougamae,deco-tate2bou,deco-ukebako)
-        (fun inctx -> (read-block inctx txt))
+        (fun inctx -> (
+          if Length.((frame-shift +' body-shift) == 0pt) then block-nil
+          else
+            (block-skip (0pt -' frame-shift -' body-shift -' (large-skip *' 1.0) -' dummy-len)) +++
+            (line-break false false (set-paragraph-margin 0pt large-skip ctx) (empty-inline-bb ++ inline-fil))
+        ) +++
+        (read-block inctx txt))
       ))
     )
   )
@@ -195,25 +239,24 @@ let circle-frame radius = (|
 |)
 
 let normal-title-make-box title-config config ctx title-it =
-  read-inline (ctx |> set-text-color title-config#color-title) {\font-style (title-config#fonttitle) {#title-it;}}
+  read-inline (ctx |> set-text-color title-config#color) {\font-style (title-config#fonttitle) {#title-it;}}
 
-let normal-title-graphics-titlebb title-config config ctx title-ib =
+let normal-title-graphicsbb title-config config ctx title-ib =
   let null-deco _ _ _ _ = [] in
   let null-decos = (null-deco,null-deco,null-deco,null-deco) in
   block-frame-breakable ctx (
-    config#left +' title-config#left-title +' config#boxsep,config#right +' title-config#right-title +' config#boxsep,
-    title-config#top-title +' config#boxsep, title-config#bottom-title +' config#boxsep
+    title-config#left +' config#boxsep,title-config#right +' config#boxsep,
+    title-config#top +' config#boxsep, title-config#bottom +' config#boxsep
   ) null-decos (fun inctx -> (
     line-break false false inctx (title-ib ++ inline-fil)
   ))
 
 let normal-title-shifts title-config config ctx title-ib = 
-  (0pt,get-natural-length (normal-title-graphics-titlebb title-config config ctx title-ib))
+  (0pt,0pt -' get-natural-length (normal-title-graphicsbb title-config config ctx title-ib))
 
 let normal-title-graphics title-config config ctx (x,y) width height depth title-ib =
   let title-ib-from-bb = 
-    (inline-skip (0pt -' config#left)) ++
-    embed-block-breakable ctx (normal-title-graphics-titlebb title-config config ctx title-ib)
+    embed-block-breakable ctx (normal-title-graphicsbb title-config config ctx title-ib)
   in
   let (title-w,title-h,title-d) = get-natural-metrics title-ib-from-bb in
   let shift = title-h +' title-d in
@@ -223,13 +266,13 @@ let normal-title-graphics title-config config ctx (x,y) width height depth title
     (lt-b,rt-b,(fun p -> (p |> rt-path |> (title-config#frame#top-rule rt-l lt-r) |> lt-path)),List.append lt-gr rt-gr)
   in
   let start-pt = (x +' width,y +' height -' (title-h +' title-d)) in
-  List.append [
-    fill title-config#color-back-title (
+  [
+    fill title-config#color-back (
       start-path start-pt |> (title-config#frame#right-rule start-pt rt) |> top-path
         |> (title-config#frame#left-rule lt (x,y +' height -' (title-h +' title-d))) |> close-with-line
     );
-    draw-text (x +' config#left,y +' height -' title-h) title-ib-from-bb;
-  ] top-gr
+    draw-text (x,y +' height -' title-h) title-ib-from-bb;
+  ]
 
 let normal-title title-config = (|
   make-box = normal-title-make-box title-config;
@@ -239,10 +282,10 @@ let normal-title title-config = (|
 
 let boxed-title-graphics-title-b title-config config ctx title-ib =
   let paddings = (
-    config#left +' config#boxsep,
-    config#right +' config#boxsep,
-    config#top +' config#boxsep,
-    config#bottom +' config#boxsep
+    title-config#left +' config#boxsep,
+    title-config#right +' config#boxsep,
+    title-config#top +' config#boxsep,
+    title-config#bottom +' config#boxsep
   ) in
   let deco (x,y) width height depth =
     let (rt-b,rt-l,rt-path,rt-gr) = title-config#frame#right-top (x +' width,y +' height) in
@@ -254,21 +297,23 @@ let boxed-title-graphics-title-b title-config config ctx title-ib =
         |> (title-config#frame#bottom-rule lb-r rb-l) |> rb-path |> (title-config#frame#right-rule rb-t rt-b) |> close-with-line
     in
     [
-      fill title-config#color-back-title path;
-      stroke config#boxrule config#color-frame path;
+      fill title-config#color-back path;
+      stroke title-config#boxrule title-config#color-frame path;
     ]
   in
-  (inline-skip (0pt -' config#left)) ++ inline-frame-outer paddings deco title-ib
+  inline-frame-outer paddings deco title-ib
 
 let boxed-title-shifts title-config config ctx title-b =
   let (w,h,d) = get-natural-metrics (boxed-title-graphics-title-b title-config config ctx title-b) in
-  (h +' d,0pt)
+  let (sx,sy) = title-config#shift in
+  (0pt -' h -' d,if sy <' 0pt then sy else 0pt)
 
 let boxed-title-graphics title-config config ctx (x,y) width height depth title-ib =
   let title-framed-ib = boxed-title-graphics-title-b title-config config ctx title-ib in
   let (w,h,d) = get-natural-metrics title-framed-ib in
+  let (sx,sy) = title-config#shift in
   [
-    draw-text (x +' config#left,y +' height -' h) title-framed-ib;
+    draw-text (x +' sx,y +' height -' h +' sy) title-framed-ib;
   ]
 
 let boxed-title title-config = (|
@@ -276,7 +321,18 @@ let boxed-title title-config = (|
   graphics = boxed-title-graphics title-config;
   shifts = boxed-title-shifts title-config;
 |)
-%  
+
+let stroke-frame-one config _ path = [stroke config#boxrule config#color path]
+let stroke-frame config = (|
+  left-top = stroke-frame-one config;
+  right-top = stroke-frame-one config;
+  left-bottom = stroke-frame-one config;
+  right-bottom = stroke-frame-one config;
+  top-rule = stroke-frame-one config;
+  bottom-rule = stroke-frame-one config;
+  left-rule = stroke-frame-one config;
+  right-rule = stroke-frame-one config;
+|)
 
 let default-config = (|
   left-skip = 0pt;
@@ -289,19 +345,19 @@ let default-config = (|
   bottom = 2mm;
   boxsep = 1mm;
   boxrule = 0.5mm;
+  frame-path = circle-frame 3pt;
   color-back = Color.white;
-  color-frame = (Color.gray 0.2);
 |)
 
 let normal-title-default-config = (|
   frame = circle-frame 3pt;
-  top-title = 0pt;
-  bottom-title = 0pt;
-  left-title = 0pt;
-  right-title = 0pt;
+  top = 0pt;
+  bottom = 0pt;
+  left = 0pt;
+  right = 0pt;
   fonttitle = [];
-  color-title = Color.white;
-  color-back-title = (Color.gray 0.2);
+  color = Color.white;
+  color-back = (Color.gray 0.2);
 |)
 
 end
