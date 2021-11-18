@@ -44,14 +44,16 @@ type colorbox-config = (|
 |)
 
 type colorbox-frame-graphic = (|
-  left-top: colorbox-config -> path -> graphics list;
-  right-top: colorbox-config -> path -> graphics list;
-  left-bottom: colorbox-config -> path -> graphics list;
-  right-bottom: colorbox-config -> path -> graphics list;
-  top-rule: colorbox-config -> path -> graphics list;
-  bottom-rule: colorbox-config -> path -> graphics list;
-  left-rule: colorbox-config -> path -> graphics list;
-  right-rule: colorbox-config -> path -> graphics list;
+  % 中心点 from to
+  left-top: colorbox-config -> (length*length) -> (length*length) -> (length*length) -> path -> graphics list;
+  right-top: colorbox-config -> (length*length) -> (length*length) -> (length*length) -> path -> graphics list;
+  left-bottom: colorbox-config -> (length*length) -> (length*length) -> (length*length) ->path -> graphics list;
+  right-bottom: colorbox-config -> (length*length) -> (length*length) -> (length*length) ->path -> graphics list;
+  % from to
+  top-rule: colorbox-config -> (length*length) -> (length*length) ->path -> graphics list;
+  bottom-rule: colorbox-config -> (length*length) -> (length*length) ->path -> graphics list;
+  left-rule: colorbox-config -> (length*length) -> (length*length) -> path -> graphics list;
+  right-rule: colorbox-config -> (length*length) -> (length*length) -> path -> graphics list;
 |)
 
 
@@ -67,7 +69,10 @@ module Colorbox : sig
   val normal-frame: colorbox-frame-path
   val circle-frame: length -> colorbox-frame-path
   val stroke-frame: (|
-    boxrule: length;
+    top-rule: length;
+    bottom-rule: length;
+    left-rule: length;
+    right-rule: length;
     color: color;
   |) -> colorbox-frame-graphic
   val normal-title: (|
@@ -119,18 +124,18 @@ let colorbox-scheme config frame-scheme title-scheme ctx ?:title-txt txt =
     let (rt-b,rt-l,rt-path,rt-gr-ex) = config#frame-path#right-top (x +' width,y +' height +' frame-shift) in
     let top-path = config#frame-path#top-rule rt-l lt-r in
     let path p = p |> rt-path |>  top-path |> lt-path in
-    let lt-gr = frame-scheme#left-top config (start-path lt-r |> lt-path |> terminate-path) in
-    let t-gr = frame-scheme#top-rule config (start-path rt-l |> top-path |> terminate-path) in
-    let rt-gr = frame-scheme#right-top config (start-path rt-b |> rt-path |> terminate-path) in
+    let lt-gr = frame-scheme#left-top config (x,y +' height +' frame-shift) lt-r lt-b (start-path lt-r |> lt-path |> terminate-path) in
+    let t-gr = frame-scheme#top-rule config  rt-l lt-r (start-path rt-l |> top-path |> terminate-path) in
+    let rt-gr = frame-scheme#right-top config (x +' width,y +' height +' frame-shift) rt-b rt-l (start-path rt-b |> rt-path |> terminate-path) in
     (rt-b,lt-b,path,(List.concat [rt-gr;t-gr;lt-gr]),(List.append lt-gr-ex rt-gr-ex))
   in
   let deco-bottom-path (x,y) width height depth =
     let (lb-t,lb-r,lb-path,lb-gr-ex) = config#frame-path#left-bottom (x,y -' depth) in
     let (rb-l,rb-t,rb-path,rb-gr-ex) = config#frame-path#right-bottom (x +' width,y -' depth) in
     let b-path = config#frame-path#bottom-rule lb-r rb-l in
-    let lb-gr = frame-scheme#left-bottom config (start-path lb-t |> lb-path |> terminate-path) in
-    let b-gr = frame-scheme#bottom-rule config (start-path lb-r |> b-path |> terminate-path) in
-    let rb-gr = frame-scheme#right-bottom config (start-path rb-l |> rb-path |> terminate-path) in
+    let lb-gr = frame-scheme#left-bottom config (x,y -' depth) lb-t lb-r (start-path lb-t |> lb-path |> terminate-path) in
+    let b-gr = frame-scheme#bottom-rule config lb-r rb-l (start-path lb-r |> b-path |> terminate-path) in
+    let rb-gr = frame-scheme#right-bottom config (x +' width,y -' depth) rb-l rb-t (start-path rb-l |> rb-path |> terminate-path) in
     let path p = p |> lb-path |> b-path |> rb-path  in
     (lb-t,rb-t,path,(List.concat [lb-gr;b-gr;rb-gr]),(List.append lb-gr-ex rb-gr-ex))
   in
@@ -139,8 +144,8 @@ let colorbox-scheme config frame-scheme title-scheme ctx ?:title-txt txt =
     let (lb,rb,b-path,b-gr,b-gr-ex) = deco-bottom-path pt width height depth in
     let r-path = config#frame-path#right-rule rb rt in
     let l-path = config#frame-path#left-rule lt lb in
-    let l-gr = frame-scheme#left-rule config (start-path lt |> l-path |> terminate-path) in
-    let r-gr = frame-scheme#right-rule config (start-path rb |> r-path |> terminate-path) in
+    let l-gr = frame-scheme#left-rule config lt lb (start-path lt |> l-path |> terminate-path) in
+    let r-gr = frame-scheme#right-rule config rb rt (start-path rb |> r-path |> terminate-path) in
     let back-gr = [fill config#color-back (start-path rt |> t-path |> l-path |> b-path |> r-path |> close-with-line)] in
     let gr = List.concat [back-gr;t-gr;l-gr;b-gr;r-gr;t-gr-ex;b-gr-ex] in
     if is-title-available then
@@ -151,9 +156,9 @@ let colorbox-scheme config frame-scheme title-scheme ctx ?:title-txt txt =
   let deco-dougamae (x,y) width height depth = 
     let (rt,lt,t-path,t-gr,t-gr-ex) = deco-top-path (x,y) width height depth in
     let l-path = config#frame-path#left-rule lt (x,y -' depth) in
-    let l-gr = frame-scheme#left-rule config (start-path lt |> l-path |> terminate-path) in
+    let l-gr = frame-scheme#left-rule config lt (x,y -' depth) (start-path lt |> l-path |> terminate-path) in
     let r-path = config#frame-path#right-rule (x +' width, y -' depth) rt in
-    let r-gr = frame-scheme#right-rule config (start-path (x +' width, y -' depth) |> r-path |> terminate-path )in
+    let r-gr = frame-scheme#right-rule config (x +' width, y -' depth) rt (start-path (x +' width, y -' depth) |> r-path |> terminate-path )in
     let back-gr = [fill config#color-back (start-path (x +' width, y -' depth) |> r-path |> t-path |> l-path |> close-with-line)] in
     let gr = List.concat [back-gr;r-gr;t-gr;l-gr;t-gr-ex] in
     if is-title-available then
@@ -165,8 +170,8 @@ let colorbox-scheme config frame-scheme title-scheme ctx ?:title-txt txt =
     let (lb,rb,b-path,b-gr,b-gr-ex) = deco-bottom-path (x,y) width height depth in
     let l-path = config#frame-path#left-rule (x,y +' height) lb in
     let r-path = config#frame-path#right-rule rb (x +' width,y +' height) in
-    let l-gr = frame-scheme#left-rule config (start-path (x,y +' height) |> l-path |> terminate-path) in
-    let r-gr = frame-scheme#right-rule config (start-path rb |> r-path |> terminate-path) in
+    let l-gr = frame-scheme#left-rule config (x,y +' height) lb (start-path (x,y +' height) |> l-path |> terminate-path) in
+    let r-gr = frame-scheme#right-rule config rb (x +' width,y +' height) (start-path rb |> r-path |> terminate-path) in
     let back-gr = [fill config#color-back (start-path (x, y +' height) |> l-path |> b-path |> r-path |> close-with-line)] in
     List.concat [back-gr;l-gr;b-gr;r-gr;b-gr-ex]
   in
@@ -176,30 +181,32 @@ let colorbox-scheme config frame-scheme title-scheme ctx ?:title-txt txt =
     let back-gr = [fill config#color-back (start-path (x +' width, y -' depth) |> r-path |> line-to (x,y +' height) |> l-path |> close-with-line);] in
     List.concat [
       back-gr;
-      frame-scheme#left-rule config (start-path (x,y +' height) |> l-path |> terminate-path);
-      frame-scheme#right-rule config (start-path (x +' width,y -' depth) |> r-path |> terminate-path);
+      frame-scheme#left-rule config (x,y +' height) (x,y -' depth) (start-path (x,y +' height) |> l-path |> terminate-path);
+      frame-scheme#right-rule config (x +' width,y -' depth) (x +' width,y +' height) (start-path (x +' width,y -' depth) |> r-path |> terminate-path);
     ]
   in
   let large-skip = 10000pt in
   let empty-inline-bb = inline-graphics 10pt 10pt 10pt (fun pt -> []) in
-  let dummy-txt = line-break false false (set-paragraph-margin 0pt 0pt ctx) (empty-inline-bb ++ inline-fil) in
-  let dummy-len = get-natural-length dummy-txt in
-  (
-    (
-      block-frame-breakable ctx (config#left-skip,config#right-skip,config#before-skip,config#after-skip) null-decos (fun c -> (
-      block-frame-breakable c
-        paddings
-        (deco-ro,deco-dougamae,deco-tate2bou,deco-ukebako)
-        (fun inctx -> (
-          if Length.((frame-shift +' body-shift) == 0pt) then block-nil
-          else
-            (block-skip (0pt -' frame-shift -' body-shift -' (large-skip *' 1.0) -' dummy-len)) +++
-            (line-break false false (set-paragraph-margin 0pt large-skip ctx) (empty-inline-bb ++ inline-fil))
-        ) +++
-        (read-block inctx txt))
-      ))
-    )
-  )
+  let dummy-bb = line-break false false (set-paragraph-margin 0pt 0pt ctx) (empty-inline-bb ++ inline-fil) in
+  let dummy-len = get-natural-length dummy-bb in
+  let out-block c =
+    block-frame-breakable c
+      paddings
+      (deco-ro,deco-dougamae,deco-tate2bou,deco-ukebako)
+      (fun inctx -> (
+        if Length.((frame-shift +' body-shift) == 0pt) then block-nil
+        else
+          (block-skip (0pt -' frame-shift -' body-shift -' (large-skip *' 1.0) -' dummy-len)) +++
+          (line-break false false (set-paragraph-margin 0pt large-skip ctx) (empty-inline-bb ++ inline-fil))
+      ) +++ (read-block inctx txt))
+  in
+  if
+    Length.(config#left-skip == 0pt) &&
+    Length.(config#right-skip == 0pt) &&
+    Length.(config#before-skip == 0pt) &&
+    Length.(config#after-skip == 0pt)
+  then out-block ctx
+  else block-frame-breakable ctx (config#left-skip,config#right-skip,config#before-skip,config#after-skip) null-decos out-block
 
 let normal-rule from to = line-to to 
 let normal-corner pt = (pt,pt,(fun p -> p),[])
@@ -322,16 +329,65 @@ let boxed-title title-config = (|
   shifts = boxed-title-shifts title-config;
 |)
 
-let stroke-frame-one config _ path = [stroke config#boxrule config#color path]
+let stroke-frame-corner angle stroke-config config (x,y) (from-x,from-y) (to-x,to-y) path =
+  let (c,s) = (cos (angle *. 3.14159 /. 180.0),sin (angle *. 3.14159 /. 180.0)) in
+  let (from-rule,to-rule) =
+    if Float.(angle == 0.0) then (stroke-config#right-rule,stroke-config#top-rule)
+    else if Float.(angle == 90.0) then (stroke-config#top-rule,stroke-config#left-rule)
+    else if Float.(angle == 180.0) then (stroke-config#left-rule,stroke-config#bottom-rule)
+    else if Float.(angle == 270.0) then (stroke-config#bottom-rule,stroke-config#right-rule)
+    else (0pt,0pt) % BUG
+  in
+  if Length.(from-rule == to-rule) then [stroke from-rule stroke-config#color path;]
+  else 
+    % 原点シフト→-angle回転→(a,b)相似変換→angle変換→(原点シフト)^{-1}
+    % (m11,m_12,m_21,m_22,shift-x,shift-y)，シフトは行列かけた後
+    let make-matrix a b = (
+      (1.0 -. a)*.c*.c +. (1.0 -. b)*.s*.s,
+      (b -. a)*.s*.c,
+      (b -. a)*.s*.c,
+      (1.0 -. a)*.s*.s +. (1.0 -. b)*.c*.c,
+      to-x*'a*.c*.c +' from-x*'b*.s*.s +' to-y*'a*.c*.s -' from-y*'b*.c*.s,
+      to-x*'a*.c*.s -' from-x*'b*.c*.s +' to-y*'a*.s*.s +' from-y*'b*.c*.c
+    ) in
+    let abs l = if Length.(l < 0pt) then (0pt -' l) else l in
+    let from-dist = abs ((from-x -' to-x) *' c +' (from-y -' to-y) *' s) in
+    let to-dist = abs ((from-x -' to-x) *' s -' (from-y -' to-y) *' c) in
+    let from-scale = (from-rule /' from-dist) *. 0.5 in
+    let to-scale = (to-rule /' to-dist) *. 0.5 in
+    let (o11,o12,o21,o22,o-shift-x,o-shift-y) = make-matrix (0.0 -. from-scale) (0.0 -. to-scale) in
+    let (i11,i12,i21,i22,i-shift-x,i-shift-y) = make-matrix from-scale to-scale in
+    let trans-i (xx,yy) = (xx *' i11 +' yy  *' i12 +' i-shift-x,xx *' i21 +' yy *' i22 +' i-shift-y) in
+    let trans-o (xx,yy) = (xx *' o11 +' yy  *' o12 +' o-shift-x,xx *' o21 +' yy *' o22 +' o-shift-y) in
+    let path-i = shift-path (i-shift-x,i-shift-y) (linear-transform-path i11 i12 i21 i22 path) in
+    let path-o = shift-path (o-shift-x,o-shift-y) (linear-transform-path o11 o12 o21 o22 path) in
+    let from-line = start-path (trans-o (from-x,from-y)) |> line-to (trans-i (from-x,from-y)) |> terminate-path in
+    let to-line = start-path (trans-o (to-x,to-y)) |> line-to (trans-i (to-x,to-y)) |> terminate-path in
+    let path = unite-path (unite-path (unite-path path-o to-line) path-i) from-line in
+    % path-iとpath-oが同じ向きなので，外側の端点を結ぶ直線で分けてやる
+    % はみ出るとやばい．
+%    let path-i-compl = start-path (trans-i (to-x,to-y)) |> line-to (trans-o (to-x,to-y)) |> line-to (trans-o (from-x,from-y)) |> line-to (trans-i (from-x,from-y)) |> terminate-path in
+%    let path-o-compl = start-path (trans-o (to-x,to-y)) |> line-to (trans-o (from-x,from-y)) |> terminate-path in
+%    let path-a = unite-path path-i-compl path-i in
+%    let path-b = unite-path path-o path-o-compl in
+    [
+%      fill stroke-config#color path-a;
+%      fill stroke-config#color path-b;
+       fill stroke-config#color path;
+    ]
+
 let stroke-frame config = (|
-  left-top = stroke-frame-one config;
-  right-top = stroke-frame-one config;
-  left-bottom = stroke-frame-one config;
-  right-bottom = stroke-frame-one config;
-  top-rule = stroke-frame-one config;
-  bottom-rule = stroke-frame-one config;
-  left-rule = stroke-frame-one config;
-  right-rule = stroke-frame-one config;
+  right-top = stroke-frame-corner 0.0 config;
+%  left-top = stroke-frame-corner 90.0 config;
+%  left-bottom = stroke-frame-corner 180.0 config;
+%  right-bottom = stroke-frame-corner 270.0 config;
+  left-top = (fun _ _ _ _ _ -> []);
+  left-bottom = (fun _ _ _ _ _ -> []);
+  right-bottom = (fun _ _ _ _ _ -> []);
+  top-rule = (fun _ _ _ path -> [stroke config#top-rule config#color path]);
+  bottom-rule = (fun _ _ _ path -> [stroke config#bottom-rule config#color path]);
+  left-rule = (fun _ _ _ path -> [stroke config#left-rule config#color path]);
+  right-rule = (fun _ _ _ path -> [stroke config#right-rule config#color path]);
 |)
 
 let default-config = (|
