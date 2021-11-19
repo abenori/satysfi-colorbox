@@ -91,6 +91,36 @@ module Colorbox : sig
   |) -> colorbox-title
   type colorbox-option
   val +colorbox : [(colorbox-option list)?; inline-text?; block-text] block-cmd
+  val left: length -> colorbox-option
+  val right: length -> colorbox-option
+  val top: length -> colorbox-option
+  val bottom: length -> colorbox-option
+  val toptitle: length -> colorbox-option
+  val bottomtitle: length -> colorbox-option
+  val boxsep: length -> colorbox-option
+  val coltext: color -> colorbox-option
+  val colframe: color -> colorbox-option
+  val colback: color -> colorbox-option
+  val fonttitle: style list -> colorbox-option
+  val coltitle: color -> colorbox-option
+  val colbacktitle: color -> colorbox-option
+  val title-filled: bool -> colorbox-option
+  val before-skip: length -> colorbox-option
+  val after-skip: length -> colorbox-option
+  val left-skip: length -> colorbox-option
+  val right-skip: length -> colorbox-option
+  val toprule: length -> colorbox-option
+  val bottomrule: length -> colorbox-option
+  val leftrule: length -> colorbox-option
+  val rightrule: length -> colorbox-option
+  val titlerule: length -> colorbox-option
+  val boxrule: length -> colorbox-option
+  val arc: length -> colorbox-option
+  val attach-boxed-title-on-top-left: colorbox-option
+  val attach-boxed-title-on-top-center: colorbox-option
+  val attach-boxed-title-on-top-right: colorbox-option
+  val boxtitle-xshift: length -> colorbox-option
+  val boxtitle-yshift: length -> colorbox-option
 end = struct
 
 let len-to-str l = Float.to-string (Length.to-float l) ^ `pt`
@@ -458,7 +488,7 @@ let make-title option =
       % height depth
       shift-x = shift-x;
       % 枠のwidth objのwidth 
-      shift-y = (fun _ _ -> option#boxtitle-yshift);
+      shift-y = (fun _ _ -> (option#boxtitle-yshift +' option#bottomrule));
     |)
 
 let make-config option= (|
@@ -498,9 +528,9 @@ let rightrule l t = (|t with rightrule = l|)
 let titlerule l t = (|t with titlerule = l|)
 let boxrule l t = (|t with leftrule = l;rightrule = l;toprule = l;bottomrule = l|)
 let arc l t = (|t with arc = l;|)
-let attach-boxed-title-on-top-left b t = (|t with title-type = title-type-boxed-top-left|)
-let attach-boxed-title-on-top-center b t = (|t with title-type = title-type-boxed-top-center|)
-let attach-boxed-title-on-top-right b t = (|t with title-type = title-type-boxed-top-right|)
+let attach-boxed-title-on-top-left t = (|t with title-type = title-type-boxed-top-left|)
+let attach-boxed-title-on-top-center t = (|t with title-type = title-type-boxed-top-center|)
+let attach-boxed-title-on-top-right t = (|t with title-type = title-type-boxed-top-right|)
 let boxtitle-xshift l t = (|t with boxtitle-xshift = l|)
 let boxtitle-yshift l t = (|t with boxtitle-yshift = l|)
 
