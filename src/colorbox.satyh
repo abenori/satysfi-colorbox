@@ -42,9 +42,9 @@ type colorbox-frame = (|
 |)
 
 type colorbox-title = (|
-  make-box: colorbox-config -> context -> inline-text -> inline-boxes;
-  graphics: colorbox-config ->  context -> (length*length) -> length -> length -> length -> inline-boxes -> (graphics list);
-  shifts: colorbox-config ->  context -> inline-boxes -> (length * length * length); % 枠自身のずらし，本文のずらし，下方向枠ずらし
+  make-box: colorbox-config -> colorbox-frame -> context -> inline-text -> inline-boxes;
+  graphics: colorbox-config -> colorbox-frame -> context -> (length*length) -> length -> length -> length -> inline-boxes -> (graphics list);
+  shifts: colorbox-config -> colorbox-frame -> context -> inline-boxes -> (length * length * length); % 枠自身のずらし，本文のずらし，下方向枠ずらし
 |)
 
 module Colorbox : sig
@@ -65,7 +65,6 @@ module Colorbox : sig
     radius: length;
   |) -> colorbox-frame
   val normal-title: (|
-    frame: colorbox-frame;
     top: length;
     bottom: length;
     left: length;
@@ -73,6 +72,8 @@ module Colorbox : sig
     fonttitle: style list;
     color: color;
     color-back: color;
+    bottom-rule: length;
+    color-frame: color;
   |) -> colorbox-title
   val boxed-title: (|
     frame: colorbox-frame;
@@ -83,8 +84,13 @@ module Colorbox : sig
     fonttitle: style list;
     color: color;
     color-back: color;
-    shift: (length*length);
+    % height depth
+    shift-x: length -> length -> length;
+    % 枠のwidth objのwidth 
+    shift-y: length -> length -> length;
   |) -> colorbox-title
+  type colorbox-option
+  val +colorbox : [(colorbox-option list)?; inline-text?; block-text] block-cmd
 end = struct
 
 let len-to-str l = Float.to-string (Length.to-float l) ^ `pt`
@@ -92,8 +98,8 @@ let colorbox-scheme config frame title-scheme ctx ?:title-txt txt =
   let (is-title-available,title-ib,frame-shift,body-shift,bottom-shift) =
     match title-txt with
     | Some(t) -> 
-      let ib = title-scheme#make-box config ctx t in
-      let (fs,bs,bots) = title-scheme#shifts config ctx ib in
+      let ib = title-scheme#make-box config frame ctx t in
+      let (fs,bs,bots) = title-scheme#shifts config frame ctx ib in
       (true,ib,fs,bs,bots)
     | None -> (false,inline-nil,0pt,0pt,0pt)
   in
@@ -122,7 +128,7 @@ let colorbox-scheme config frame title-scheme ctx ?:title-txt txt =
     let back-gr = [fill config#color-back (start-path rt |> t-path |> l-path |> b-path |> r-path |> close-with-line)] in
     let gr = List.concat [back-gr;t-gr;l-gr;b-gr;r-gr] in
     if is-title-available then
-      let title-gr = title-scheme#graphics config ctx pt width height depth title-ib in
+      let title-gr = title-scheme#graphics config frame ctx pt width height depth title-ib in
       List.append gr title-gr
     else gr
   in
@@ -133,7 +139,7 @@ let colorbox-scheme config frame title-scheme ctx ?:title-txt txt =
     let back-gr = [fill config#color-back (start-path (x +' width, y -' depth) |> r-path |> t-path |> l-path |> close-with-line)] in
     let gr = List.concat [back-gr;r-gr;t-gr;l-gr] in
     if is-title-available then
-      let title-gr = title-scheme#graphics config ctx (x,y) width height depth title-ib in
+      let title-gr = title-scheme#graphics config frame ctx (x,y) width height depth title-ib in
       List.append gr title-gr
     else gr
   in
@@ -259,7 +265,7 @@ let circle-frame frame-config = (|
   right-rule = normal-rule frame-config#right-rule frame-config#color;
 |)
 
-let normal-title-make-box title-config config ctx title-it =
+let normal-title-make-box title-config config frame ctx title-it =
   read-inline (ctx |> set-text-color title-config#color) {\font-style (title-config#fonttitle) {#title-it;}}
 
 let normal-title-graphicsbb title-config config ctx title-ib =
@@ -272,24 +278,28 @@ let normal-title-graphicsbb title-config config ctx title-ib =
     line-break false false inctx (title-ib ++ inline-fil)
   ))
 
-let normal-title-shifts title-config config ctx title-ib = 
+let normal-title-shifts title-config config frame ctx title-ib = 
   (0pt,0pt -' get-natural-length (normal-title-graphicsbb title-config config ctx title-ib),0pt)
 
-let normal-title-graphics title-config config ctx (x,y) width height depth title-ib =
+let normal-title-graphics title-config config frame ctx (x,y) width height depth title-ib =
   let title-ib-from-bb = 
     embed-block-breakable ctx (normal-title-graphicsbb title-config config ctx title-ib)
   in
   let (title-w,title-h,title-d) = get-natural-metrics title-ib-from-bb in
   let shift = title-h +' title-d in
-  let (lt-r,lt-b,lt-path,lt-gr) = title-config#frame#left-top config (x,y +' height) in
-  let (rt-b,rt-l,rt-path,rt-gr) = title-config#frame#right-top config (x +' width,y +' height) in
-  let (t-path,t-gr) = title-config#frame#top-rule config rt-l lt-r in
-  let (r-path,r-gr) = title-config#frame#right-rule config (x +' width,y +' height -' (title-h +' title-d)) rt-b in
-  let (l-path,l-gr) = title-config#frame#left-rule config lt-b (x,y +' height -' (title-h +' title-d)) in
+  let (lt-r,lt-b,lt-path,lt-gr) = frame#left-top config (x,y +' height) in
+  let (rt-b,rt-l,rt-path,rt-gr) = frame#right-top config (x +' width,y +' height) in
+  let (t-path,t-gr) = frame#top-rule config rt-l lt-r in
+  let (r-path,r-gr) = frame#right-rule config (x +' width,y +' height -' (title-h +' title-d)) rt-b in
+  let (l-path,l-gr) = frame#left-rule config lt-b (x,y +' height -' (title-h +' title-d)) in
   let start-pt = (x +' width,y +' height -' (title-h +' title-d)) in
-  [
-    fill title-config#color-back (start-path start-pt |> r-path |> rt-path |> t-path |> lt-path |> l-path |> close-with-line);
-    draw-text (x,y +' height -' shift) title-ib-from-bb;
+  List.concat [
+    [fill title-config#color-back (start-path start-pt |> r-path |> rt-path |> t-path |> lt-path |> l-path |> close-with-line)];
+    [stroke title-config#bottom-rule title-config#color-frame (
+      start-path (x,y +' height -' (title-h +' title-d)) |> line-to (x +' width,y +' height -' (title-h +' title-d)) |> terminate-path
+    )];
+    r-gr;rt-gr;t-gr;lt-gr;l-gr;
+    [draw-text (x,y +' height -' title-h) title-ib-from-bb];
   ]
 
 let normal-title title-config = (|
@@ -324,18 +334,24 @@ let boxed-title-graphics-title-b title-config config ctx title-ib =
   in
   inline-frame-outer paddings deco title-ib
 
-let boxed-title-shifts title-config config ctx title-b =
-  let box = boxed-title-graphics-title-b title-config config ctx title-b in
-  let (w,h,d) = get-natural-metrics title-b in
-  let (sx,sy) = title-config#shift in
-  (0pt -' h -' d,if sy <' 0pt then sy else 0pt,0pt)
+let boxed-title-shifts title-config config frame ctx title-b =
+  let (w,h,d) = get-natural-metrics (boxed-title-graphics-title-b title-config config ctx title-b) in
+  let sy = title-config#shift-y h d in
+  let box-v-length = h +' d in
+  if h +' d +' sy >' 0pt then (0pt -' h -' d -' sy,sy,0pt)
+  else (0pt,sy,0pt)
 
-let boxed-title-graphics title-config config ctx (x,y) width height depth title-ib =
+let boxed-title-graphics title-config config frame ctx (x,y) width height depth title-ib =
   let title-framed-ib = boxed-title-graphics-title-b title-config config ctx title-ib in
   let (w,h,d) = get-natural-metrics title-framed-ib in
-  let (sx,sy) = title-config#shift in
+  let sx = title-config#shift-x width w in
+  let sy = title-config#shift-y h d in
+  let new-sy =
+    if h +' d +' sy >' 0pt then 0pt
+    else h +' d +' sy
+  in
   [
-    draw-text (x +' sx,y +' height -' h +' sy) title-framed-ib;
+    draw-text (x +' sx,y +' height -' h +' new-sy) title-framed-ib;
   ]
 
 let boxed-title title-config = (|
@@ -344,6 +360,193 @@ let boxed-title title-config = (|
   shifts = boxed-title-shifts title-config;
 |)
 
+let title-type-normal = 1
+let title-type-boxed-top-left = 2
+let title-type-boxed-top-center = 3
+let title-type-boxed-top-right = 4
 
+type colorbox-option-data = (|
+  left: length;
+  right: length;
+  bottom: length;
+  top: length;
+  toptitle: length;
+  bottomtitle: length;
+  lefttitle: length;
+  righttitle: length;
+  boxsep: length;
+  coltext: color;
+  colframe: color;
+  colback: color;
+  fonttitle: style list;
+  coltitle: color;
+  colbacktitle: color;
+  title-filled: bool;
+  title-type: int;
+  before-skip: length;
+  after-skip: length;
+  left-skip: length;
+  right-skip: length;
+  toprule: length;
+  bottomrule: length;
+  leftrule: length;
+  rightrule: length;
+  titlerule: length;
+  % boxrule
+  arc: length;
+  % outer arc, arc is singular
+  % righttitle etc
+  % toggle-left-and-right
+  % sharp corners, rounded corners
+  % opacity opacityframe etc.
+  % before title, after title
+  % overlay
+  % flush left etc.
+  boxtitle-xshift: length;
+  boxtitle-yshift: length;
+|)
+type colorbox-option = colorbox-option-data -> colorbox-option-data
+
+let make-frame option =
+  if Length.(option#arc == 0pt) then
+    normal-frame (|
+      color = option#colframe;
+      top-rule = option#toprule;
+      bottom-rule = option#bottomrule;
+      right-rule = option#rightrule;
+      left-rule = option#leftrule;
+    |)
+  else
+    circle-frame (|
+      color = option#colframe;
+      top-rule = option#toprule;
+      bottom-rule = option#bottomrule;
+      right-rule = option#rightrule;
+      left-rule = option#leftrule;
+      radius = option#arc;
+    |)
+
+let make-title option =
+  if option#title-type == title-type-normal then
+    normal-title (|
+      top = option#toptitle +' option#boxsep;
+      bottom = option#bottomtitle +' option#boxsep;
+      left = option#lefttitle +' option#boxsep;
+      right = option#righttitle +' option#boxsep;
+      fonttitle = option#fonttitle;
+      color = option#coltitle;
+      color-back = if option#title-filled then option#colbacktitle else option#colframe;
+      color-frame = option#colframe;
+      bottom-rule = option#titlerule;
+    |)
+  else
+    let frame = make-frame option in
+    let shift-x = 
+      if option#title-type == 2 then (fun _ _ -> option#boxtitle-xshift) % left
+      else if option#title-type == 3 then (fun width w -> ((width -' w) *' 0.5) +' option#boxtitle-xshift)% center
+      else (fun width w -> (width -' w +' option#boxtitle-xshift)) % right
+    in
+    boxed-title (|
+      frame = frame;
+      top = option#toptitle +' option#boxsep;
+      bottom = option#bottomtitle +' option#boxsep;
+      left = option#lefttitle +' option#boxsep;
+      right = option#righttitle +' option#boxsep;
+      fonttitle = option#fonttitle;
+      color = option#coltitle;
+      color-back = option#colbacktitle;
+      % height depth
+      shift-x = shift-x;
+      % 枠のwidth objのwidth 
+      shift-y = (fun _ _ -> option#boxtitle-yshift);
+    |)
+
+let make-config option= (|
+  left-skip = option#left-skip;
+  right-skip = option#right-skip;
+  before-skip = option#before-skip;
+  after-skip = option#after-skip;
+  left = option#left;
+  right = option#right;
+  top = option#top;
+  bottom = option#bottom;
+  color-back = option#colback;
+|)
+
+let left l t = (|t with left = l|)
+let right l t = (|t with right = l|)
+let top l t = (|t with top = l|)
+let bottom l t = (|t with bottom = l|)
+let toptitle l t = (|t with toptitle = l|)
+let bottomtitle l t = (|t with bottomtitle = l|)
+let boxsep l t = (|t with boxsep = l|)
+let coltext c t = (|t with coltext = c|)
+let colframe c t = (|t with colframe = c|)
+let colback c t = (|t with colback = c|)
+let fonttitle s t = (|t with fonttitle = s|)
+let coltitle c t = (|t with coltitle = c|)
+let colbacktitle c t = (|t with colbacktitle = c|)
+let title-filled b t = (|t with title-filled = b|)
+let before-skip l t = (|t with before-skip = l|)
+let after-skip l t = (|t with after-skip = l|)
+let left-skip l t = (|t with left-skip = l|)
+let right-skip l t = (|t with right-skip = l|)
+let toprule l t = (|t with toprule = l|)
+let bottomrule l t = (|t with bottomrule = l|)
+let leftrule l t = (|t with leftrule = l|)
+let rightrule l t = (|t with rightrule = l|)
+let titlerule l t = (|t with titlerule = l|)
+let boxrule l t = (|t with leftrule = l;rightrule = l;toprule = l;bottomrule = l|)
+let arc l t = (|t with arc = l;|)
+let attach-boxed-title-on-top-left b t = (|t with title-type = title-type-boxed-top-left|)
+let attach-boxed-title-on-top-center b t = (|t with title-type = title-type-boxed-top-center|)
+let attach-boxed-title-on-top-right b t = (|t with title-type = title-type-boxed-top-right|)
+let boxtitle-xshift l t = (|t with boxtitle-xshift = l|)
+let boxtitle-yshift l t = (|t with boxtitle-yshift = l|)
+
+let-block ctx +colorbox ?:optopt ?:title-txt text =
+  let default-option = (|
+    left = 4mm;
+    right = 4mm;
+    bottom = 2mm;
+    top = 2mm;
+    toptitle = 0mm;
+    bottomtitle = 0mm;
+    lefttitle = 0mm;
+    righttitle = 0mm;
+    boxsep = 1mm;
+    coltext = Color.black;
+    colframe = (Color.gray 0.25);
+    colback = (Color.gray 0.95);
+    fonttitle = [];
+    coltitle = Color.white;
+    colbacktitle = (Color.gray 0.5);
+    title-filled = false;
+    title-type = title-type-normal;
+    before-skip = 0pt;
+    after-skip = 0pt;
+    left-skip = 0pt;
+    right-skip = 0pt;
+    toprule = 0.5mm;
+    bottomrule= 0.5mm;
+    leftrule = 0.5mm;
+    rightrule = 0.5mm;
+    titlerule = 0.5mm;
+    arc = 1mm;
+    boxtitle-xshift = 0pt;
+    boxtitle-yshift = 0pt;
+  |) in
+  
+  let opt = 
+    match optopt with 
+    | Some(o) -> List.fold-left (fun t f -> (f t)) default-option o
+    | None -> default-option
+  in
+  let config = make-config opt in
+  let frame = make-frame opt in
+  let title = make-title opt in
+  match title-txt with
+  | Some(t) -> colorbox-scheme config frame title ctx ?:t text
+  | None -> colorbox-scheme config frame title ctx text
 end
 
