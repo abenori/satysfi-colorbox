@@ -44,7 +44,7 @@ type colorbox-frame = (|
 type colorbox-title = (|
   make-box: colorbox-config -> context -> inline-text -> inline-boxes;
   graphics: colorbox-config ->  context -> (length*length) -> length -> length -> length -> inline-boxes -> (graphics list);
-  shifts: colorbox-config ->  context -> inline-boxes -> (length * length); % 枠自身のずらし，さらに本文のずらし
+  shifts: colorbox-config ->  context -> inline-boxes -> (length * length * length); % 枠自身のずらし，本文のずらし，下方向枠ずらし
 |)
 
 module Colorbox : sig
@@ -89,13 +89,13 @@ end = struct
 
 let len-to-str l = Float.to-string (Length.to-float l) ^ `pt`
 let colorbox-scheme config frame title-scheme ctx ?:title-txt txt =
-  let (is-title-available,title-ib,frame-shift,body-shift) =
+  let (is-title-available,title-ib,frame-shift,body-shift,bottom-shift) =
     match title-txt with
     | Some(t) -> 
       let ib = title-scheme#make-box config ctx t in
-      let (fs,bs) = title-scheme#shifts config ctx ib in
-      (true,ib,fs,bs)
-    | None -> (false,inline-nil,0pt,0pt)
+      let (fs,bs,bots) = title-scheme#shifts config ctx ib in
+      (true,ib,fs,bs,bots)
+    | None -> (false,inline-nil,0pt,0pt,0pt)
   in
   let null-deco _ _ _ _ = [] in
   let null-decos = (null-deco,null-deco,null-deco,null-deco) in
@@ -108,8 +108,8 @@ let colorbox-scheme config frame title-scheme ctx ?:title-txt txt =
     (rt-b,lt-b,path,(List.concat [rt-gr;t-gr;lt-gr]))
   in
   let deco-bottom-path (x,y) width height depth =
-    let (lb-t,lb-r,lb-path,lb-gr) = frame#left-bottom config (x,y -' depth) in
-    let (rb-l,rb-t,rb-path,rb-gr) = frame#right-bottom config (x +' width,y -' depth) in
+    let (lb-t,lb-r,lb-path,lb-gr) = frame#left-bottom config (x,y -' depth +' bottom-shift) in
+    let (rb-l,rb-t,rb-path,rb-gr) = frame#right-bottom config (x +' width,y -' depth+' bottom-shift) in
     let (b-path,b-gr) = frame#bottom-rule config lb-r rb-l in
     let path p = p |> lb-path |> b-path |> rb-path  in
     (lb-t,rb-t,path,(List.concat [lb-gr;b-gr;rb-gr]))
@@ -163,7 +163,12 @@ let colorbox-scheme config frame title-scheme ctx ?:title-txt txt =
         else
           (block-skip (0pt -' frame-shift -' body-shift -' (large-skip *' 1.0) -' dummy-len)) +++
           (line-break false false (set-paragraph-margin 0pt large-skip ctx) (empty-inline-bb ++ inline-fil))
-      ) +++ (read-block inctx txt))
+      ) +++ (read-block inctx txt)) +++ (
+        if Length.(bottom-shift == 0pt) then block-nil
+        else
+          (line-break false false (set-paragraph-margin large-skip 0pt ctx) (empty-inline-bb ++ inline-fil)) +++
+          (block-skip (0pt -' frame-shift -' body-shift -' (large-skip *' 1.0) -' dummy-len))
+      )
   in
   if
     Length.(config#left-skip == 0pt) &&
@@ -268,7 +273,7 @@ let normal-title-graphicsbb title-config config ctx title-ib =
   ))
 
 let normal-title-shifts title-config config ctx title-ib = 
-  (0pt,0pt -' get-natural-length (normal-title-graphicsbb title-config config ctx title-ib))
+  (0pt,0pt -' get-natural-length (normal-title-graphicsbb title-config config ctx title-ib),0pt)
 
 let normal-title-graphics title-config config ctx (x,y) width height depth title-ib =
   let title-ib-from-bb = 
@@ -323,7 +328,7 @@ let boxed-title-shifts title-config config ctx title-b =
   let box = boxed-title-graphics-title-b title-config config ctx title-b in
   let (w,h,d) = get-natural-metrics title-b in
   let (sx,sy) = title-config#shift in
-  (0pt -' h -' d,if sy <' 0pt then sy else 0pt)
+  (0pt -' h -' d,if sy <' 0pt then sy else 0pt,0pt)
 
 let boxed-title-graphics title-config config ctx (x,y) width height depth title-ib =
   let title-framed-ib = boxed-title-graphics-title-b title-config config ctx title-ib in
