@@ -42,9 +42,9 @@ type colorbox-frame = (|
 |)
 
 type colorbox-title = (|
-  make-box: colorbox-config -> colorbox-frame -> context -> inline-text -> inline-boxes;
+  make-box: colorbox-config -> colorbox-frame -> context -> inline-text -> (inline-boxes * int list);
   graphics: colorbox-config -> colorbox-frame -> context -> (length*length) -> length -> length -> length -> inline-boxes -> (graphics list);
-  shifts: colorbox-config -> colorbox-frame -> context -> inline-boxes -> (length * length * length); % 枠自身のずらし，本文のずらし，下方向枠ずらし
+  shifts: colorbox-config -> colorbox-frame -> context -> inline-boxes -> (length * length * length * length); % 枠自身のずらし，本文のずらし，下方向枠ずらし，それ以降のずらし，表示場所
 |)
 
 module Colorbox : sig
@@ -74,6 +74,7 @@ module Colorbox : sig
     color-back: color;
     bottom-rule: length;
     color-frame: color;
+    at-bottom: bool;
   |) -> colorbox-title
   val boxed-title: (|
     frame: colorbox-frame;
@@ -88,6 +89,7 @@ module Colorbox : sig
     shift-x: length -> length -> length;
     % 枠のwidth objのwidth 
     shift-y: length -> length -> length;
+    at-bottom: bool;
   |) -> colorbox-title
   type colorbox-option
   val +colorbox : [(colorbox-option list)?; inline-text?; block-text] block-cmd
@@ -119,19 +121,27 @@ module Colorbox : sig
   val attach-boxed-title-on-top-left: colorbox-option
   val attach-boxed-title-on-top-center: colorbox-option
   val attach-boxed-title-on-top-right: colorbox-option
+  val attach-boxed-title-on-bottom-left: colorbox-option
+  val attach-boxed-title-on-bottom-center: colorbox-option
+  val attach-boxed-title-on-bottom-right: colorbox-option
+  val flip-title: colorbox-option
   val boxtitle-xshift: length -> colorbox-option
   val boxtitle-yshift: length -> colorbox-option
+  val boxed-title-colframe: color -> colorbox-option
 end = struct
 
+% for debug
 let len-to-str l = Float.to-string (Length.to-float l) ^ `pt`
+let draw-point c (x,y) = fill c (start-path (x -' 2pt,y -' 2pt) |> line-to (x +' 2pt,y -' 2pt) |> line-to (x +' 2pt,y +' 2pt) |> line-to (x -' 2pt,y +' 2pt) |> close-with-line)
+
 let colorbox-scheme config frame title-scheme ctx ?:title-txt txt =
-  let (is-title-available,title-ib,frame-shift,body-shift,bottom-shift) =
+  let (is-title-available,title-ib,frame-shift,body-shift,bottom-frame-shift,bottom-body-shift,position) =
     match title-txt with
     | Some(t) -> 
-      let ib = title-scheme#make-box config frame ctx t in
-      let (fs,bs,bots) = title-scheme#shifts config frame ctx ib in
-      (true,ib,fs,bs,bots)
-    | None -> (false,inline-nil,0pt,0pt,0pt)
+      let (ib,pos) = title-scheme#make-box config frame ctx t in
+      let (fs,bs,bfs,bbs) = title-scheme#shifts config frame ctx ib in
+      (true,ib,fs,bs,bfs,bbs,pos)
+    | None -> (false,inline-nil,0pt,0pt,0pt,0pt,[])
   in
   let null-deco _ _ _ _ = [] in
   let null-decos = (null-deco,null-deco,null-deco,null-deco) in
@@ -144,20 +154,27 @@ let colorbox-scheme config frame title-scheme ctx ?:title-txt txt =
     (rt-b,lt-b,path,(List.concat [rt-gr;t-gr;lt-gr]))
   in
   let deco-bottom-path (x,y) width height depth =
-    let (lb-t,lb-r,lb-path,lb-gr) = frame#left-bottom config (x,y -' depth +' bottom-shift) in
-    let (rb-l,rb-t,rb-path,rb-gr) = frame#right-bottom config (x +' width,y -' depth+' bottom-shift) in
+%    let () = display-message (`bottom-body-shift = ` ^ (len-to-str bottom-body-shift)) in
+    let (lb-t,lb-r,lb-path,lb-gr) = frame#left-bottom config (x,y -' depth -' bottom-body-shift) in
+    let (rb-l,rb-t,rb-path,rb-gr) = frame#right-bottom config (x +' width,y -' depth -' bottom-body-shift) in
     let (b-path,b-gr) = frame#bottom-rule config lb-r rb-l in
     let path p = p |> lb-path |> b-path |> rb-path  in
     (lb-t,rb-t,path,(List.concat [lb-gr;b-gr;rb-gr]))
   in
+  let exists a b = 
+    match List.find (fun x -> x == a) b with
+    | None -> false
+    | Some(_) -> true
+  in
   let deco-ro pt width height depth =
+%    let () = display-message (`width = ` ^ (len-to-str width) ^ `, height = ` ^ (len-to-str height) ^ `, depth = ` ^ (len-to-str depth)) in
     let (rt,lt,t-path,t-gr) = deco-top-path pt width height depth in
     let (lb,rb,b-path,b-gr) = deco-bottom-path pt width height depth in
     let (r-path,r-gr) = frame#right-rule config rb rt in
     let (l-path,l-gr) = frame#left-rule config lt lb in
     let back-gr = [fill config#color-back (start-path rt |> t-path |> l-path |> b-path |> r-path |> close-with-line)] in
     let gr = List.concat [back-gr;t-gr;l-gr;b-gr;r-gr] in
-    if is-title-available then
+    if is-title-available && (exists 0 position) then
       let title-gr = title-scheme#graphics config frame ctx pt width height depth title-ib in
       List.append gr title-gr
     else gr
@@ -168,7 +185,7 @@ let colorbox-scheme config frame title-scheme ctx ?:title-txt txt =
     let (r-path,r-gr) = frame#right-rule config (x +' width, y -' depth) rt in
     let back-gr = [fill config#color-back (start-path (x +' width, y -' depth) |> r-path |> t-path |> l-path |> close-with-line)] in
     let gr = List.concat [back-gr;r-gr;t-gr;l-gr] in
-    if is-title-available then
+    if is-title-available && (exists 1 position) then
       let title-gr = title-scheme#graphics config frame ctx (x,y) width height depth title-ib in
       List.append gr title-gr
     else gr
@@ -178,33 +195,49 @@ let colorbox-scheme config frame title-scheme ctx ?:title-txt txt =
     let (l-path,l-gr) = frame#left-rule config (x,y +' height) lb in
     let (r-path,r-gr) = frame#right-rule config rb (x +' width,y +' height) in
     let back-gr = [fill config#color-back (start-path (x, y +' height) |> l-path |> b-path |> r-path |> close-with-line)] in
-    List.concat [back-gr;l-gr;b-gr;r-gr]
+    let gr = List.concat [back-gr;l-gr;b-gr;r-gr] in
+    if is-title-available && (exists 3 position) then
+      let title-gr = title-scheme#graphics config frame ctx (x,y) width height depth title-ib in
+      List.append gr title-gr
+    else gr
+    
   in
   let deco-tate2bou (x,y) width height depth = 
     let (l-path,l-gr) = frame#left-rule config (x,y +' height) (x,y -' depth) in
     let (r-path,r-gr) = frame#right-rule config (x +' width,y -' depth) (x +' width,y +' height) in
     let back-gr = [fill config#color-back (start-path (x +' width, y -' depth) |> r-path |> line-to (x,y +' height) |> l-path |> close-with-line);] in
-    List.concat [back-gr;l-gr;r-gr]
+    let gr = List.concat [back-gr;l-gr;r-gr] in
+    if is-title-available && (exists 2 position) then
+      let title-gr = title-scheme#graphics config frame ctx (x,y) width height depth title-ib in
+      List.append gr title-gr
+    else gr
   in
   let large-skip = 10000pt in
-  let empty-inline-bb = inline-graphics 10pt 10pt 10pt (fun pt -> []) in
-  let dummy-bb = line-break false false (set-paragraph-margin 0pt 0pt ctx) (empty-inline-bb ++ inline-fil) in
-  let dummy-len = get-natural-length dummy-bb in
   let out-block c =
     block-frame-breakable c
       paddings
       (deco-ro,deco-dougamae,deco-tate2bou,deco-ukebako)
       (fun inctx -> (
-        if Length.((frame-shift +' body-shift) == 0pt) then block-nil
-        else
-          (block-skip (0pt -' frame-shift -' body-shift -' (large-skip *' 1.0) -' dummy-len)) +++
-          (line-break false false (set-paragraph-margin 0pt large-skip ctx) (empty-inline-bb ++ inline-fil))
-      ) +++ (read-block inctx txt)) +++ (
-        if Length.(bottom-shift == 0pt) then block-nil
-        else
-          (line-break false false (set-paragraph-margin large-skip 0pt ctx) (empty-inline-bb ++ inline-fil)) +++
-          (block-skip (0pt -' frame-shift -' body-shift -' (large-skip *' 1.0) -' dummy-len))
-      )
+        let empty-inline-bb = inline-graphics 10pt 10pt 10pt (fun pt -> []) in
+%        let empty-inline-bb = read-inline inctx {あ} in
+        let dummy-bb = line-break false false (set-paragraph-margin 0pt 0pt inctx) (empty-inline-bb ++ inline-fil) in
+        let dummy-len = get-natural-length dummy-bb in
+        (
+          if Length.((frame-shift +' body-shift) == 0pt) then block-nil
+          else
+            (block-skip (0pt -' frame-shift -' body-shift -' large-skip -' dummy-len)) +++
+            (line-break false false (set-paragraph-margin 0pt large-skip inctx) (empty-inline-bb ++ inline-fil))
+        ) +++
+        (read-block inctx txt)
+        +++ (
+          if Length.(bottom-frame-shift +' bottom-body-shift == 0pt) then block-nil
+          else
+            (line-break false false (set-paragraph-margin large-skip 0pt inctx) (empty-inline-bb ++ inline-fil)) +++
+            (block-skip (0pt -' bottom-frame-shift -' bottom-body-shift -' large-skip -' (dummy-len *' 2.0)))
+             +++
+            (line-break false false (set-paragraph-margin 0pt 0pt inctx) (empty-inline-bb ++ inline-fil))
+        )
+      ))
   in
   if
     Length.(config#left-skip == 0pt) &&
@@ -296,7 +329,8 @@ let circle-frame frame-config = (|
 |)
 
 let normal-title-make-box title-config config frame ctx title-it =
-  read-inline (ctx |> set-text-color title-config#color) {\font-style (title-config#fonttitle) {#title-it;}}
+  let b = read-inline (ctx |> set-text-color title-config#color) {\font-style (title-config#fonttitle) {#title-it;}} in
+  (b,if title-config#at-bottom then [0;3] else [0;1])
 
 let normal-title-graphicsbb title-config config ctx title-ib =
   let null-deco _ _ _ _ = [] in
@@ -309,28 +343,45 @@ let normal-title-graphicsbb title-config config ctx title-ib =
   ))
 
 let normal-title-shifts title-config config frame ctx title-ib = 
-  (0pt,0pt -' get-natural-length (normal-title-graphicsbb title-config config ctx title-ib),0pt)
+  let title-height = get-natural-length (normal-title-graphicsbb title-config config ctx title-ib) in
+  if title-config#at-bottom then (0pt,0pt,0pt -' title-height,0pt)
+  else (0pt,0pt -' title-height,0pt,0pt)
 
 let normal-title-graphics title-config config frame ctx (x,y) width height depth title-ib =
   let title-ib-from-bb = 
     embed-block-breakable ctx (normal-title-graphicsbb title-config config ctx title-ib)
   in
   let (title-w,title-h,title-d) = get-natural-metrics title-ib-from-bb in
-  let shift = title-h +' title-d in
-  let (lt-r,lt-b,lt-path,lt-gr) = frame#left-top config (x,y +' height) in
-  let (rt-b,rt-l,rt-path,rt-gr) = frame#right-top config (x +' width,y +' height) in
-  let (t-path,t-gr) = frame#top-rule config rt-l lt-r in
-  let (r-path,r-gr) = frame#right-rule config (x +' width,y +' height -' (title-h +' title-d)) rt-b in
-  let (l-path,l-gr) = frame#left-rule config lt-b (x,y +' height -' (title-h +' title-d)) in
-  let start-pt = (x +' width,y +' height -' (title-h +' title-d)) in
-  List.concat [
-    [fill title-config#color-back (start-path start-pt |> r-path |> rt-path |> t-path |> lt-path |> l-path |> close-with-line)];
-    [stroke title-config#bottom-rule title-config#color-frame (
-      start-path (x,y +' height -' (title-h +' title-d)) |> line-to (x +' width,y +' height -' (title-h +' title-d)) |> terminate-path
-    )];
-    r-gr;rt-gr;t-gr;lt-gr;l-gr;
-    [draw-text (x,y +' height -' title-h) title-ib-from-bb];
-  ]
+  if title-config#at-bottom then
+    let (lb-t,lb-r,lb-path,lb-gr) = frame#left-bottom config (x,y -' depth) in
+    let (rb-l,rb-t,rb-path,rb-gr) = frame#right-bottom config (x +' width,y -' depth) in
+    let (b-path,b-gr) = frame#bottom-rule config lb-r rb-l in
+    let (l-path,l-gr) = frame#left-rule config (x,y -' depth  +' title-h +' title-d) lb-t in
+    let (r-path,r-gr) = frame#right-rule config rb-t (x +' width,y -' depth  +' title-h +' title-d) in
+    let start-pt = (x,y -' depth +' title-h +' title-d) in
+    List.concat [
+      [fill title-config#color-back (start-path start-pt |> l-path |> lb-path |> b-path |> rb-path |> r-path |> close-with-line)];
+      [stroke title-config#bottom-rule title-config#color-frame (
+        start-path start-pt |> line-to (x +' width,y -' depth +' title-h +' title-d) |> terminate-path
+      )];
+      l-gr;lb-gr;b-gr;rb-gr;r-gr;
+      [draw-text (x,y -' depth +' title-d) title-ib-from-bb];
+    ]
+  else
+    let (lt-r,lt-b,lt-path,lt-gr) = frame#left-top config (x,y +' height) in
+    let (rt-b,rt-l,rt-path,rt-gr) = frame#right-top config (x +' width,y +' height) in
+    let (t-path,t-gr) = frame#top-rule config rt-l lt-r in
+    let (r-path,r-gr) = frame#right-rule config (x +' width,y +' height -' (title-h +' title-d)) rt-b in
+    let (l-path,l-gr) = frame#left-rule config lt-b (x,y +' height -' (title-h +' title-d)) in
+    let start-pt = (x +' width,y +' height -' (title-h +' title-d)) in
+    List.concat [
+      [fill title-config#color-back (start-path start-pt |> r-path |> rt-path |> t-path |> lt-path |> l-path |> close-with-line)];
+      [stroke title-config#bottom-rule title-config#color-frame (
+        start-path (x,y +' height -' (title-h +' title-d)) |> line-to (x +' width,y +' height -' (title-h +' title-d)) |> terminate-path
+      )];
+      r-gr;rt-gr;t-gr;lt-gr;l-gr;
+      [draw-text (x,y +' height -' title-h) title-ib-from-bb];
+    ]
 
 let normal-title title-config = (|
   make-box = normal-title-make-box title-config;
@@ -367,21 +418,36 @@ let boxed-title-graphics-title-b title-config config ctx title-ib =
 let boxed-title-shifts title-config config frame ctx title-b =
   let (w,h,d) = get-natural-metrics (boxed-title-graphics-title-b title-config config ctx title-b) in
   let sy = title-config#shift-y h d in
-  let box-v-length = h +' d in
-  if h +' d +' sy >' 0pt then (0pt -' h -' d -' sy,sy,0pt)
-  else (0pt,sy,0pt)
+%  let () = display-message (`shifts, height = ` ^ (len-to-str h) ^ `, depth = ` ^ (len-to-str d) ^ `, sy = ` ^ (len-to-str sy)) in
+  if title-config#at-bottom then
+    if sy >' 0pt then
+      if h +' d >' sy then (0pt,0pt,0pt -' sy,sy -' h -' d)
+      else (0pt,0pt,0pt -' sy,0pt)
+    else (0pt,0pt,0pt,sy -' h -' d)
+  else
+    if h +' d +' sy >' 0pt then (0pt -' h -' d -' sy,0pt,0pt,0pt)
+    else (0pt,sy,0pt,0pt)
+  
 
 let boxed-title-graphics title-config config frame ctx (x,y) width height depth title-ib =
   let title-framed-ib = boxed-title-graphics-title-b title-config config ctx title-ib in
   let (w,h,d) = get-natural-metrics title-framed-ib in
+%  let () = display-message (`height = ` ^ (len-to-str h) ^ `, y - depth = ` ^ (len-to-str (y -' depth))) in
   let sx = title-config#shift-x width w in
   let sy = title-config#shift-y h d in
-  let new-sy =
-    if h +' d +' sy >' 0pt then 0pt
-    else h +' d +' sy
+  let title-point =
+    if title-config#at-bottom then
+      if h +' d >' sy then (x +' sx,y -' depth +' d)
+      else (x +' sx,y -' depth +' sy -' h)
+    else
+      let new-sy =
+        if h +' d +' sy >' 0pt then 0pt
+        else h +' d +' sy
+      in
+      (x +' sx,y +' height -' h +' new-sy)
   in
   [
-    draw-text (x +' sx,y +' height -' h +' new-sy) title-framed-ib;
+    draw-text title-point title-framed-ib;
   ]
 
 let boxed-title title-config = (|
@@ -391,9 +457,13 @@ let boxed-title title-config = (|
 |)
 
 let title-type-normal = 1
-let title-type-boxed-top-left = 2
-let title-type-boxed-top-center = 3
-let title-type-boxed-top-right = 4
+let title-type-normal-flip = 2
+let title-type-boxed-top-left = 3
+let title-type-boxed-top-center = 4
+let title-type-boxed-top-right = 5
+let title-type-boxed-bottom-left = 6
+let title-type-boxed-bottom-center = 7
+let title-type-boxed-bottom-right = 8
 
 type colorbox-option-data = (|
   left: length;
@@ -434,13 +504,14 @@ type colorbox-option-data = (|
   % flush left etc.
   boxtitle-xshift: length;
   boxtitle-yshift: length;
+  boxed-title-colframe: color option;
 |)
 type colorbox-option = colorbox-option-data -> colorbox-option-data
 
-let make-frame option =
+let make-frame color option =
   if Length.(option#arc == 0pt) then
     normal-frame (|
-      color = option#colframe;
+      color = color;
       top-rule = option#toprule;
       bottom-rule = option#bottomrule;
       right-rule = option#rightrule;
@@ -448,7 +519,7 @@ let make-frame option =
     |)
   else
     circle-frame (|
-      color = option#colframe;
+      color = color;
       top-rule = option#toprule;
       bottom-rule = option#bottomrule;
       right-rule = option#rightrule;
@@ -457,7 +528,7 @@ let make-frame option =
     |)
 
 let make-title option =
-  if option#title-type == title-type-normal then
+  if option#title-type == title-type-normal || option#title-type == title-type-normal-flip then
     normal-title (|
       top = option#toptitle +' option#boxsep;
       bottom = option#bottomtitle +' option#boxsep;
@@ -468,14 +539,24 @@ let make-title option =
       color-back = if option#title-filled then option#colbacktitle else option#colframe;
       color-frame = option#colframe;
       bottom-rule = option#titlerule;
+      at-bottom = (option#title-type == title-type-normal-flip);
     |)
   else
-    let frame = make-frame option in
+    let frame =
+      make-frame (match option#boxed-title-colframe with |None -> option#colframe |Some(c) ->c) option in
     let shift-x = 
-      if option#title-type == 2 then (fun _ _ -> option#boxtitle-xshift) % left
-      else if option#title-type == 3 then (fun width w -> ((width -' w) *' 0.5) +' option#boxtitle-xshift)% center
-      else (fun width w -> (width -' w +' option#boxtitle-xshift)) % right
+      if option#title-type == title-type-boxed-top-left || option#title-type == title-type-boxed-bottom-left then
+        (fun _ _ -> option#boxtitle-xshift) % left
+      else if option#title-type == title-type-boxed-top-center || option#title-type == title-type-boxed-bottom-center then
+        (fun width w -> ((width -' w) *' 0.5) +' option#boxtitle-xshift)% center
+      else
+        (fun width w -> (width -' w +' option#boxtitle-xshift)) % right
     in
+    let at-bottom = (
+      option#title-type == title-type-boxed-bottom-left ||
+      option#title-type == title-type-boxed-bottom-center ||
+      option#title-type == title-type-boxed-bottom-right
+    ) in
     boxed-title (|
       frame = frame;
       top = option#toptitle +' option#boxsep;
@@ -488,7 +569,8 @@ let make-title option =
       % height depth
       shift-x = shift-x;
       % 枠のwidth objのwidth 
-      shift-y = (fun _ _ -> (option#boxtitle-yshift +' option#bottomrule));
+      shift-y = (fun _ _ -> (option#boxtitle-yshift +' (if at-bottom then (0pt -' option#bottomrule) else option#bottomrule)));
+      at-bottom = at-bottom;
     |)
 
 let make-config option= (|
@@ -531,8 +613,13 @@ let arc l t = (|t with arc = l;|)
 let attach-boxed-title-on-top-left t = (|t with title-type = title-type-boxed-top-left|)
 let attach-boxed-title-on-top-center t = (|t with title-type = title-type-boxed-top-center|)
 let attach-boxed-title-on-top-right t = (|t with title-type = title-type-boxed-top-right|)
+let attach-boxed-title-on-bottom-left t = (|t with title-type = title-type-boxed-bottom-left|)
+let attach-boxed-title-on-bottom-center t = (|t with title-type = title-type-boxed-bottom-center|)
+let attach-boxed-title-on-bottom-right t = (|t with title-type = title-type-boxed-bottom-right|)
+let flip-title t = (|t with title-type = title-type-normal-flip|)
 let boxtitle-xshift l t = (|t with boxtitle-xshift = l|)
 let boxtitle-yshift l t = (|t with boxtitle-yshift = l|)
+let boxed-title-colframe c t = (|t with boxed-title-colframe = Some(c)|)
 
 let-block ctx +colorbox ?:optopt ?:title-txt text =
   let default-option = (|
@@ -565,6 +652,7 @@ let-block ctx +colorbox ?:optopt ?:title-txt text =
     arc = 1mm;
     boxtitle-xshift = 0pt;
     boxtitle-yshift = 0pt;
+    boxed-title-colframe = None;
   |) in
   
   let opt = 
@@ -573,7 +661,7 @@ let-block ctx +colorbox ?:optopt ?:title-txt text =
     | None -> default-option
   in
   let config = make-config opt in
-  let frame = make-frame opt in
+  let frame = make-frame opt#colframe opt in
   let title = make-title opt in
   match title-txt with
   | Some(t) -> colorbox-scheme config frame title ctx ?:t text
