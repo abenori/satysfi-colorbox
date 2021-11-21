@@ -43,28 +43,32 @@ type colorbox-frame = (|
 
 type colorbox-title = (|
   make-box: colorbox-config -> colorbox-frame -> context -> inline-text -> (inline-boxes * int list);
-  graphics: colorbox-config -> colorbox-frame -> context -> (length*length) -> length -> length -> length -> inline-boxes -> (graphics list);
+  graphics: colorbox-config -> colorbox-frame -> context -> int -> (length*length) -> length -> length -> length -> inline-boxes -> (graphics list);
   shifts: colorbox-config -> colorbox-frame -> context -> inline-boxes -> (length * length * length * length); % 枠自身のずらし，本文のずらし，下方向枠ずらし，それ以降のずらし，表示場所
 |)
 
 module Colorbox : sig
   val colorbox-scheme: colorbox-config -> colorbox-frame -> colorbox-title -> context -> inline-text ?-> block-text -> block-boxes
-  val normal-frame: (|
+
+  val normal-frame: 'a -> colorbox-frame
+  constraint 'a :: (|
     color: color;
     top-rule: length;
     bottom-rule: length;
     right-rule: length;
     left-rule: length;
-  |) -> colorbox-frame
-  val circle-frame: (|
+  |)
+  val circle-frame: 'a -> colorbox-frame
+  constraint 'a :: (|
     color: color;
     top-rule: length;
     bottom-rule: length;
     right-rule: length;
     left-rule: length;
     radius: length;
-  |) -> colorbox-frame
-  val normal-title: (|
+  |)
+  val normal-title: 'a -> colorbox-title
+  constraint 'a :: (|
     top: length;
     bottom: length;
     left: length;
@@ -75,8 +79,9 @@ module Colorbox : sig
     bottom-rule: length;
     color-frame: color;
     at-bottom: bool;
-  |) -> colorbox-title
-  val boxed-title: (|
+  |)
+  val boxed-title: 'a -> colorbox-title
+  constraint 'a :: (|
     frame: colorbox-frame;
     top: length;
     bottom: length;
@@ -90,7 +95,7 @@ module Colorbox : sig
     % 枠のwidth objのwidth 
     shift-y: length -> length -> length;
     at-bottom: bool;
-  |) -> colorbox-title
+  |)
   type colorbox-option
   val +colorbox : [(colorbox-option list)?; inline-text?; block-text] block-cmd
   val left: length -> colorbox-option
@@ -175,7 +180,7 @@ let colorbox-scheme config frame title-scheme ctx ?:title-txt txt =
     let back-gr = [fill config#color-back (start-path rt |> t-path |> l-path |> b-path |> r-path |> close-with-line)] in
     let gr = List.concat [back-gr;t-gr;l-gr;b-gr;r-gr] in
     if is-title-available && (exists 0 position) then
-      let title-gr = title-scheme#graphics config frame ctx pt width height depth title-ib in
+      let title-gr = title-scheme#graphics config frame ctx 0 pt width height depth title-ib in
       List.append gr title-gr
     else gr
   in
@@ -186,7 +191,7 @@ let colorbox-scheme config frame title-scheme ctx ?:title-txt txt =
     let back-gr = [fill config#color-back (start-path (x +' width, y -' depth) |> r-path |> t-path |> l-path |> close-with-line)] in
     let gr = List.concat [back-gr;r-gr;t-gr;l-gr] in
     if is-title-available && (exists 1 position) then
-      let title-gr = title-scheme#graphics config frame ctx (x,y) width height depth title-ib in
+      let title-gr = title-scheme#graphics config frame ctx 1 (x,y) width height depth title-ib in
       List.append gr title-gr
     else gr
   in
@@ -197,7 +202,7 @@ let colorbox-scheme config frame title-scheme ctx ?:title-txt txt =
     let back-gr = [fill config#color-back (start-path (x, y +' height) |> l-path |> b-path |> r-path |> close-with-line)] in
     let gr = List.concat [back-gr;l-gr;b-gr;r-gr] in
     if is-title-available && (exists 3 position) then
-      let title-gr = title-scheme#graphics config frame ctx (x,y) width height depth title-ib in
+      let title-gr = title-scheme#graphics config frame ctx 3 (x,y) width height depth title-ib in
       List.append gr title-gr
     else gr
     
@@ -208,7 +213,7 @@ let colorbox-scheme config frame title-scheme ctx ?:title-txt txt =
     let back-gr = [fill config#color-back (start-path (x +' width, y -' depth) |> r-path |> line-to (x,y +' height) |> l-path |> close-with-line);] in
     let gr = List.concat [back-gr;l-gr;r-gr] in
     if is-title-available && (exists 2 position) then
-      let title-gr = title-scheme#graphics config frame ctx (x,y) width height depth title-ib in
+      let title-gr = title-scheme#graphics config frame ctx 2 (x,y) width height depth title-ib in
       List.append gr title-gr
     else gr
   in
@@ -347,7 +352,7 @@ let normal-title-shifts title-config config frame ctx title-ib =
   if title-config#at-bottom then (0pt,0pt,0pt -' title-height,0pt)
   else (0pt,0pt -' title-height,0pt,0pt)
 
-let normal-title-graphics title-config config frame ctx (x,y) width height depth title-ib =
+let normal-title-graphics title-config config frame ctx index (x,y) width height depth title-ib =
   let title-ib-from-bb = 
     embed-block-breakable ctx (normal-title-graphicsbb title-config config ctx title-ib)
   in
@@ -429,7 +434,7 @@ let boxed-title-shifts title-config config frame ctx title-b =
     else (0pt,sy,0pt,0pt)
   
 
-let boxed-title-graphics title-config config frame ctx (x,y) width height depth title-ib =
+let boxed-title-graphics title-config config frame ctx index (x,y) width height depth title-ib =
   let title-framed-ib = boxed-title-graphics-title-b title-config config ctx title-ib in
   let (w,h,d) = get-natural-metrics title-framed-ib in
 %  let () = display-message (`height = ` ^ (len-to-str h) ^ `, y - depth = ` ^ (len-to-str (y -' depth))) in
