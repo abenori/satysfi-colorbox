@@ -1,0 +1,266 @@
+@require: stdja
+@require: enumitem/enumitem
+@import: ../src/colorbox
+
+open Colorbox
+
+in
+
+document (|
+  title = {Colorbox};
+  author = {Noriyuki Abe};
+  show-title = true;
+  show-toc = false;
+|) '<
+  +section{基本的な使い方}<
+    +colorbox ?* ?:({Colorbox})<
+      +p{
+        このような枠囲みを実現するためのパッケージです．
+      }
+    >
+    
+    +p{
+      基本的な使い方は次です．\code(`@require: colorbox`);します．また以下\code(`open Colorbox`);されていると仮定します．
+    }
+    +code(``
+      +colorbox ?:[
+        top 5mm;% 設定
+      ] ?:({タイトル}) <
+        +p{ 上に5mmの空き．枠に囲まれた文章． }
+      >
+    ``);
+    +p{
+      これで次のような出力を得ます．
+    }
+    +colorbox ?:[
+      top 5mm;% 設定
+    ] ?:({タイトル}) <
+      +p{ 上に5mmの空き．枠に囲まれた文章． }
+    >
+    +p{
+      このように\code(`\colorbox [オプション] {タイトル} <本文>`);の形で指定します．
+      オプションとタイトルはオプショナル引数です．
+      オプションは\code(`;`);区切りで指定します．
+      各オプションは引数をとることがあります．
+      例えば\code(`left`);オプションは枠内の左側の空きを指定するオプションですが，これはlength型の引数を一つとります．
+      このときは\code(`[left 1mm;]`);のように書きます．
+      以下オプションの解説です．
+    }
+    +p{
+      \code(`left`);，\code(`right`);，\code(`top`);，\code(`bottom`);：いずれもlength型の引数を一つとります．枠内における本文と枠の間の空きです．それぞれ左，右，上，下の空きを指定します．
+    }
+    +p{
+      \code(`boxsep`);：枠内における本文と枠の間の空きを指定します．上述の\code(`left`);，\code(`right`);，\code(`top`);，\code(`bottom`);に加算されます．
+    }
+    +p{
+      \code(`left-skip`);，\code(`right-skip`);，\code(`top-skip`);，\code(`bottom-skip`);：いずれもlength型の引数を一つとります．枠の外の空きを指定します．
+    }
+    +p{
+      \code(`leftrule`);，\code(`rightrule`);，\code(`toprule`);，\code(`bottomrule`);：いずれもlength型の引数を一つとります．枠線の太さを指定します．\code(`boxrule`);により，一括で指定することもできます，
+    }
+    +p{
+      \code(`coltext`);：color型の引数を一つとります．\code(`coltext Color.red`);または\code(`coltext (Color.rgb 0.1 0.2 0.3)`);のように指定します．
+    }
+    +p{
+      \code(`colframe`);：color型の引数を一つとります．枠の色を指定します．
+    }
+    +p{
+      \code(`colback`);：color型の引数を一つとります．枠内の背景色を指定します．
+    }
+    +p{
+      \code(`title-filled`);：bool型（\code(`true`);または\code(`false`);）の引数を一つとります．\code(`true`);を指定すると以下の\code(`colbacktitle`);の指定が有効になります．
+    }
+    +p{
+      \code(`colbacktitle`);：color型の引数を一つとります．タイトル部の背景色を指定します．
+    }
+    +p{
+      \code(`arc`);：length型の引数を一つとります．デフォルトでは枠の四隅が四分円になりますが，この半径を指定します．\code(`0pt`);を指定すると丸みがなくなります．
+    }
+    +p{
+      \code(`attach-boxed-title-on-top-left`);：引数はありません．以下のようなタイトルの配置ができます．
+    }
+    +colorbox ?:[attach-boxed-title-on-top-left;] ?:({タイトル}) <+p{中身}>
+    +p{
+      これは次のコードにより得られます．以下このような形のタイトルをボックス型タイトルと呼びます．
+    }
+    +code(`+colorbox ?:[attach-boxed-title-on-top-left;] ?:({タイトル}) <+p{中身}>`);% <+pの前で改行すると何か変？
+    +p{
+      \code(`attach-boxed-title-on-top-center`);とするとタイトルが中央に配置されます．\code(`attach-boxed-title-on-top-right`);で右側です．
+      また\code(`attach-boxed-title-on-bottom-left`);とすると次のように枠の下にタイトルが配置されます．
+    }
+    +colorbox ?:[attach-boxed-title-on-bottom-left;] ?:({タイトル}) <+p{中身}>
+    +p{
+      \code(`attach-boxed-title-on-bottom-center`);および\code(`attach-boxed-title-on-bottom-right`);により枠の下の中央および右側にタイトルが配置されます．
+    }
+    +p{
+      \code(`flip-title`);：下のように枠の加担に通常形式のタイトルが表示されます．
+    }
+    +colorbox ?:[flip-title;] ?:({タイトル}) <+p{中身}>
+    +p{
+      \code(`boxtitle-xshift`);．\code(`boxtitle-yshift`);：どちらもlength型の引数を一つとります．ボックス型タイトルが指定されているときのみ有効です．それぞれ左右方向，上下方向にタイトルの位置を移動します．右および上が正です．
+    }
+    +p{
+      \code(`boxed-title-colframe`);：color型の引数をとります．ボックス型タイトルが指定されているときのみ有効です．タイトルの枠の色を指定します．
+    }
+    +p{
+      \code(`boxtitle-xshift`);，\code(`boxtitle-yshift`);：length型の引数をとります．ボックス型タイトルが指定されているときのみ有効です．タイトル自身を横方向および縦方向にずらします．
+    }
+  >
+  
+  +section{低レベルな命令}<
+    +p{
+      より柔軟な枠などの構成を行うために，低レベルな命令\code(`colorbox-scheme`);が定義されています．次のように使います．
+    }
+    +code(`
+      colorbox-scheme config frame title ctx ?:title-txt txt
+    `);
+    +p{
+      ここで
+      \listing{
+        * config: 基本的な設定．
+        * frame: 枠の描画の設定．
+        * title: タイトルの描画の設定．
+        * ctx: context．
+        * title-txt: タイトル．オプション引数，\code(`inline-text`);型．
+        * txt: 本文，\code(`block-text`);型．
+      }
+      です．
+      戻り値は\code(`block-boxes`);型です．
+    }
+    +p{
+      基本的な設定\code(`config`);は以下のフィールドを持つレコード型です．
+      \listing{
+        * left-skip: length型．枠の外の左の空き．
+        * right-skip: length型．枠の外の右の空き．
+        * before-skip: length型．枠の外の上の空き．
+        * after-skip: length型．枠の外の下の空き．
+        * left: length型．枠内のテキストまでの左空き．
+        * right: length型．枠内のテキストまでの右空き．
+        * top: length型．枠内のテキストまでの上空き．
+        * bottom: length型．枠内のテキストまでの下空き．
+        * color-back: color型．枠内の背景色．
+      }
+    }
+    +p{
+      枠の描画設定\code(`frame`);は以下のフィールドを持つレコード型です．
+      \listing{
+        * left-top: 左上枠の描画を行う関数．
+        * right-top: 右上枠の描画を行う関数．
+        * left-bottom: 左下枠の描画を行う関数．
+        * right-bottom: 右下枠の描画を行う関数．
+        * top-rule: 上枠の描画を行う関数．
+        * bottom-rule: 下枠の描画を行う関数．
+        * left-rule: 左枠の描画を行う関数．
+        * right-rule: 右枠の描画を行う関数．
+      }
+      このように，枠の描画は全体を八個にわけて行われます．
+      引数\code(`frame`);の各フィールドは，\code(`colorbox-scheme`);が描画を行う際に呼び出されます．
+    }
+    +p{
+      四隅を描画する関数（\code(`left-top`);，\code(`right-top`);，\code(`left-bottom`);，\code(`right-bottom`);）は次の形で呼び出されます．
+    }
+    +code(`
+      frame#left-top config point
+    `);
+    +p{
+      \code(`config`);は\code(`colorbox-scheme`);の第一引数に与えられたものがそのまま与えられます．
+      \code(`point`);は対応する枠の端の点です．
+      例えば\code(`left-top`);の場合は左上の点が与えられます．
+      この関数は以下の値を返さなければなりません．
+    }
+    +code(`
+      (from,to,path,graphic)
+    `);
+    +p{
+      \code(`path`);は\code(`prepath -> prepath`);型で，枠のパスを返します．
+      反時計回りのパスを返さなければなりません．
+      \code(`from`);と\code(`to`);はこのパスの始点と終点です．
+      両方とも\code(`length * length`);型です．
+      \code(`colorbox-scheme`);は残りの枠をこの始点と終点同士を結ぶように描画します．
+      \code(`graphic`);が実際に描画されたグラフィックで，\code(`graphics list`);型です．
+    }
+    +p{
+      残りの四カ所の枠（\code(`top-rule`);，\code(`bottom-rule`);，\code(`left-rule`);，\code(`right-rule`);）は次のように呼び出されます．
+    }
+    +code(`
+      frame#top-rule config from to
+    `);
+    +p{
+      \code(`config`);は\code(`colorbox-scheme`);の第一引数に与えられたものがそのまま与えられます．
+      \code(`from`);と\code(`to`);はこの部分の枠の始点と終点です．
+      返す値は次です．
+    }
+    +code(`
+      (path,graphic)
+    `);
+    +p{
+      \code(`path`);は\code(`prepath -> prepath`);型で，枠のパスを返します．
+      \code(`graphic`);が実際に描画されたグラフィックで，\code(`graphics list`);型です．
+    }
+    +p{
+      タイトルの描画は次のフィールドを持つレコード型です．
+      \enumerate{
+        * make-box: 与えられたタイトル（\code(`inline-text`);型）から\code(`inline-boxes`);型のボックスを作る．また，どの場合にタイトルを描画するかも通知します．
+        * shifts: 枠や本文などのずらし量を返す関数です．
+        * graphics: 実際の描画を行う関数です．
+      }
+    }
+    +p{
+      \code(`make-box`);は次の形で呼び出されます．
+    }
+    +code(`
+      title#make-box config frame ctx text
+    `);
+    +p{
+      \code(`config`);と\code(`frame`);は\code(`ccolorbox-sheme`);に渡されているものがそのまま渡されます．
+      \code(`ctx`);はcontextで，\code(`text`);が\code(`inline-boxes`);型のタイトルです．
+      これに対して，\code(`make-box`);は次を返さなければなりません．
+    }
+    +code(`
+      (title-box,output-indexes)
+    `);
+    +p{
+      \code(`title-box`);は与えられた\code(`title`);から構築された\code(`inline-boxes`);です．
+      テキストに色をつけるなどの場合はここで行います．
+      \code(`output-indexes`);は\code(`int list`);型で，ページが分割されている場合にどこで出力するかを表します．
+      それぞれ口型，冂型，｜｜型，凵型に対応して\code(`0,1,2,3`);を入れてリストで返します．
+      例えば枠の下部にタイトルを出す場合には，口型と凵型の場合に出力することになるので，\code(`[0;3]`);とします．
+    }
+    +p{
+      タイトルがある場合には，その分枠自身や本文を上下にずらす必要が出てきます．
+      この値は\code(`shifts`);で返します．
+      これは次のように呼び出されます．
+    }
+    +code(`
+      title#shifts config frame ctx text-box
+    `);
+    +p{
+      \code(`config`);，\code(`frame`);，\code(`ctx`);は\code(`make-box`);と同じです．
+      \code(`text-box`);はタイトル文字列のボックスで，これは\code(`make-box`);で返したものがそのまま渡されます．
+      次の\code(`length * length * length * length`);型の値を返さなければなりません．
+    }
+    +code(`
+      (shift1,shift2,shift3,shift4)
+    `);
+    +p{
+      それぞれ，上部枠のずらし，本文上部のずらし，下部枠のずらし，枠の後の文書本文のずらしを指定します．
+      正の値が上部方向にずらすことになります．
+      または次のように考えることもできます：\code(`-shift1`);が枠直前本文と上部枠の間の空き，\code(`-shift2`);が上部枠と本文上部の空き，\code(`-shift3`);が本文下部と下部枠の空き，\code(`-shift4`);が下部枠と続く本文の間の空き．
+    }
+    +p{
+      実際の描画を担当する関数\code(`graphics`);は次の形で呼び出されます．
+    }
+    +code(`
+      title#graphics config frame ctx index point width height depth text-box
+    `);
+    +p{
+      \code(`config`);，\code(`frame`);，\code(`ctx`);，\code(`text-box`);は\code(`shifts`);と同じです．
+      \code(`index`);は枠がページで分割されている場合にどの形の枠であるかを表します．
+      値は同様にそれぞれ口型，冂型，｜｜型，凵型に対応して\code(`0,1,2,3`);です．
+      \code(`point`);は枠で囲まれた全体の基準点，\code(`width`);，\code(`height`);，\code(`depth`);はそれぞれ横幅，高さ，深さです．
+      例えば枠全体の左下は\code(`(x, y -' depth)`);となります．
+      関数\code(`graphics`);はタイトル部分を表す\code(`graphics list`);を返さなければなりません．
+    }
+  >
+  
+>
