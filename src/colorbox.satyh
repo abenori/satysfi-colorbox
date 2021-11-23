@@ -430,7 +430,7 @@ let boxed-title-shifts title-config config frame ctx title-b =
       else (0pt,0pt,0pt -' sy,0pt)
     else (0pt,0pt,0pt,sy -' h -' d)
   else
-    if h +' d +' sy >' 0pt then (0pt -' h -' d -' sy,0pt,0pt,0pt)
+    if h +' d +' sy >' 0pt then (0pt -' h -' d -' sy,sy,0pt,0pt)
     else (0pt,sy,0pt,0pt)
   
 
