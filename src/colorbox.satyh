@@ -252,7 +252,13 @@ let colorbox-scheme config frame title-scheme ctx ?:title-txt txt =
   then out-block ctx
   else block-frame-breakable ctx (config#left-skip,config#right-skip,config#before-skip,config#after-skip) null-decos out-block
 
-let normal-rule thickness color cfg from to = ((line-to to),[stroke thickness color (start-path from |> line-to to |> terminate-path)])
+let normal-rule thickness color cfg from to =
+  (
+    (line-to to),
+    if thickness >' 0pt then
+      [stroke thickness color (start-path from |> line-to to |> terminate-path)]
+    else []
+  )
 let normal-corner cfg pt = (pt,pt,(fun p -> p),[])
 let normal-frame config = (|
   left-top = normal-corner;
@@ -313,14 +319,18 @@ let circle-frame-corner-graphics frame-config angle config (x,y) =
   in
   let (from,ctrl1,ctrl2,to) = circle-frame-corner-path angle frame-config#radius (x,y) in
   let path = bezier-to ctrl1 ctrl2 to in
-  if Length.(from-rule == to-rule) then 
-    (from,to,path,[stroke from-rule frame-config#color (start-path from |>  path |> terminate-path)])
-  else 
-    let (trans-i,trans-o) = get-stroke-frame-corner-transform from-rule to-rule angle from to in
-    let (from-i,ctrl1-i,ctrl2-i,to-i) = (trans-i from,trans-i ctrl1,trans-i ctrl2,trans-i to) in
-    let (from-o,ctrl1-o,ctrl2-o,to-o) = (trans-o from,trans-o ctrl1,trans-o ctrl2,trans-o to) in
-    let gr = fill frame-config#color (start-path from-o |> bezier-to ctrl1-o ctrl2-o to-o |> line-to to-i |> bezier-to ctrl2-i ctrl1-i from-i |> close-with-line) in
-    (from,to,path,[gr;])
+  let gr =
+    if Length.(from-rule == 0pt) && Length.(to-rule == 0pt) then []
+    else
+      if Length.(from-rule == to-rule) then 
+        [stroke from-rule frame-config#color (start-path from |>  path |> terminate-path)]
+      else 
+        let (trans-i,trans-o) = get-stroke-frame-corner-transform from-rule to-rule angle from to in
+        let (from-i,ctrl1-i,ctrl2-i,to-i) = (trans-i from,trans-i ctrl1,trans-i ctrl2,trans-i to) in
+        let (from-o,ctrl1-o,ctrl2-o,to-o) = (trans-o from,trans-o ctrl1,trans-o ctrl2,trans-o to) in
+        [fill frame-config#color (start-path from-o |> bezier-to ctrl1-o ctrl2-o to-o |> line-to to-i |> bezier-to ctrl2-i ctrl1-i from-i |> close-with-line)]
+  in
+  (from,to,path,gr)
 
 let circle-frame frame-config = (|
   right-top = circle-frame-corner-graphics frame-config 0.0;
@@ -364,11 +374,16 @@ let normal-title-graphics title-config config frame ctx index (x,y) width height
     let (l-path,l-gr) = frame#left-rule config (x,y -' depth  +' title-h +' title-d) lb-t in
     let (r-path,r-gr) = frame#right-rule config rb-t (x +' width,y -' depth  +' title-h +' title-d) in
     let start-pt = (x,y -' depth +' title-h +' title-d) in
+    let gr =
+      if title-config#bottom-rule >' 0pt then
+        [stroke title-config#bottom-rule title-config#color-frame (
+          start-path start-pt |> line-to (x +' width,y -' depth +' title-h +' title-d) |> terminate-path
+        )]
+       else []
+    in
     List.concat [
       [fill title-config#color-back (start-path start-pt |> l-path |> lb-path |> b-path |> rb-path |> r-path |> close-with-line)];
-      [stroke title-config#bottom-rule title-config#color-frame (
-        start-path start-pt |> line-to (x +' width,y -' depth +' title-h +' title-d) |> terminate-path
-      )];
+      gr;
       l-gr;lb-gr;b-gr;rb-gr;r-gr;
       [draw-text (x,y -' depth +' title-d) title-ib-from-bb];
     ]
@@ -379,11 +394,16 @@ let normal-title-graphics title-config config frame ctx index (x,y) width height
     let (r-path,r-gr) = frame#right-rule config (x +' width,y +' height -' (title-h +' title-d)) rt-b in
     let (l-path,l-gr) = frame#left-rule config lt-b (x,y +' height -' (title-h +' title-d)) in
     let start-pt = (x +' width,y +' height -' (title-h +' title-d)) in
+    let gr = 
+      if title-config#bottom-rule >' 0pt then
+        [stroke title-config#bottom-rule title-config#color-frame (
+          start-path (x,y +' height -' (title-h +' title-d)) |> line-to (x +' width,y +' height -' (title-h +' title-d)) |> terminate-path
+        )]
+      else []
+    in
     List.concat [
       [fill title-config#color-back (start-path start-pt |> r-path |> rt-path |> t-path |> lt-path |> l-path |> close-with-line)];
-      [stroke title-config#bottom-rule title-config#color-frame (
-        start-path (x,y +' height -' (title-h +' title-d)) |> line-to (x +' width,y +' height -' (title-h +' title-d)) |> terminate-path
-      )];
+      gr;
       r-gr;rt-gr;t-gr;lt-gr;l-gr;
       [draw-text (x,y +' height -' title-h) title-ib-from-bb];
     ]
