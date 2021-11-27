@@ -74,6 +74,9 @@ document (|
       \code(`colbacktitle`);：color型の引数を一つとります．タイトル部の背景色を指定します．
     }
     +p{
+      \code(`lefttitle,righttitle,toptitle,bottomtitle`);：length型の引数を一つとります．それぞれタイトルの左，右，上，下の空きを指定します．
+    }
+    +p{
       \code(`arc`);：length型の引数を一つとります．デフォルトでは枠の四隅が四分円になりますが，この半径を指定します．\code(`0pt`);を指定すると丸みがなくなります．
     }
     +p{
@@ -93,11 +96,11 @@ document (|
       \code(`attach-boxed-title-on-bottom-center`);および\code(`attach-boxed-title-on-bottom-right`);により枠の下の中央および右側にタイトルが配置されます．
     }
     +p{
-      \code(`flip-title`);：下のように枠の加担に通常形式のタイトルが表示されます．
+      \code(`flip-title`);：下のように枠の下端に通常形式のタイトルが表示されます．
     }
     +colorbox ?:[flip-title;] ?:({タイトル}) <+p{中身}>
     +p{
-      \code(`boxtitle-xshift`);．\code(`boxtitle-yshift`);：どちらもlength型の引数を一つとります．ボックス型タイトルが指定されているときのみ有効です．それぞれ左右方向，上下方向にタイトルの位置を移動します．右および上が正です．
+      \code(`boxtitle-xshift`);，\code(`boxtitle-yshift`);：どちらもlength型の引数を一つとります．ボックス型タイトルが指定されているときのみ有効です．それぞれ左右方向，上下方向にタイトルの位置を移動します．右および上が正です．
     }
     +p{
       \code(`boxed-title-colframe`);：color型の引数をとります．ボックス型タイトルが指定されているときのみ有効です．タイトルの枠の色を指定します．
@@ -112,14 +115,14 @@ document (|
       より柔軟な枠などの構成を行うために，低レベルな命令\code(`colorbox-scheme`);が定義されています．次のように使います．
     }
     +code(`
-      colorbox-scheme config frame title ctx ?:title-txt txt
+      colorbox-scheme config frame config2 ctx ?:title-txt txt
     `);
     +p{
       ここで
       \listing{
         * config: 基本的な設定．
         * frame: 枠の描画の設定．
-        * title: タイトルの描画の設定．
+        * config2: さらなる設定
         * ctx: context．
         * title-txt: タイトル．オプション引数，\code(`inline-text`);型．
         * txt: 本文，\code(`block-text`);型．
@@ -198,6 +201,13 @@ document (|
       \code(`graphic`);が実際に描画されたグラフィックで，\code(`graphics list`);型です．
     }
     +p{
+      さらなる設定\code(`config2`);は次のフィールドを持つレコード型です．
+    }
+    +code(`
+      title = (タイトル描画設定);
+      overlay = (追加描画命令);
+    `);
+    +p{
       タイトルの描画は次のフィールドを持つレコード型です．
       \enumerate{
         * make-box: 与えられたタイトル（\code(`inline-text`);型）から\code(`inline-boxes`);型のボックスを作る．また，どの場合にタイトルを描画するかも通知します．
@@ -209,7 +219,7 @@ document (|
       \code(`make-box`);は次の形で呼び出されます．
     }
     +code(`
-      title#make-box config frame ctx text
+      config2#title#make-box config frame ctx text
     `);
     +p{
       \code(`config`);と\code(`frame`);は\code(`ccolorbox-sheme`);に渡されているものがそのまま渡されます．
@@ -232,7 +242,7 @@ document (|
       これは次のように呼び出されます．
     }
     +code(`
-      title#shifts config frame ctx text-box
+      config2#title#shifts config frame ctx text-box
     `);
     +p{
       \code(`config`);，\code(`frame`);，\code(`ctx`);は\code(`make-box`);と同じです．
@@ -251,7 +261,7 @@ document (|
       実際の描画を担当する関数\code(`graphics`);は次の形で呼び出されます．
     }
     +code(`
-      title#graphics config frame ctx index point width height depth text-box
+      config2#title#graphics config frame ctx index point width height depth text-box
     `);
     +p{
       \code(`config`);，\code(`frame`);，\code(`ctx`);，\code(`text-box`);は\code(`shifts`);と同じです．
@@ -260,6 +270,19 @@ document (|
       \code(`point`);は枠で囲まれた全体の基準点，\code(`width`);，\code(`height`);，\code(`depth`);はそれぞれ横幅，高さ，深さです．
       例えば枠全体の左下は\code(`(x, y -' depth)`);となります．
       関数\code(`graphics`);はタイトル部分を表す\code(`graphics list`);を返さなければなりません．
+    }
+    +p{
+      追加描画命令\code(`overlay`);は，様々な描画が行われた後に追加して描画されます．
+      これは次の形の関数からなるリストです．
+    }
+    +code(`
+      colorbox-config -> colorbox-frame -> int -> (length * length) -> length -> length -> length -> (graphics list)
+    `);
+    +p{
+      つまり，次の形で呼び出される関数のリストです：\code(`overlay config frame index point width height depth`);．
+      \code(`config`);と\code(`frame`);は\code(`colorbox-scheme`);に渡されたものそのままです．
+      \code(`index`);は\code(`config2#title#graphics`);に与えられるものと同様で，口型，冂型，｜｜型，凵型に対応して\code(`0,1,2,3`);の値が与えられます．
+      残りも同様で，\code(`point`);は枠で囲まれた全体の基準点，\code(`width`);，\code(`height`);，\code(`depth`);はそれぞれ横幅，高さ，深さです．
     }
   >
   

@@ -48,7 +48,11 @@ type colorbox-title = (|
 |)
 
 module Colorbox : sig
-  val colorbox-scheme: colorbox-config -> colorbox-frame -> colorbox-title -> context -> inline-text ?-> block-text -> block-boxes
+  val colorbox-scheme: colorbox-config -> colorbox-frame -> 'a -> context -> inline-text ?-> block-text -> block-boxes
+  constraint 'a :: (|
+    title: colorbox-title;
+    overlay: (colorbox-config -> colorbox-frame -> int -> (length * length) -> length -> length -> length -> (graphics list)) list;
+  |)
 
   val normal-frame: 'a -> colorbox-frame
   constraint 'a :: (|
@@ -104,6 +108,8 @@ module Colorbox : sig
   val bottom: length -> colorbox-option
   val toptitle: length -> colorbox-option
   val bottomtitle: length -> colorbox-option
+  val lefttitle: length -> colorbox-option
+  val righttitle: length -> colorbox-option
   val boxsep: length -> colorbox-option
   val coltext: color -> colorbox-option
   val colframe: color -> colorbox-option
@@ -139,12 +145,12 @@ end = struct
 let len-to-str l = Float.to-string (Length.to-float l) ^ `pt`
 let draw-point c (x,y) = fill c (start-path (x -' 2pt,y -' 2pt) |> line-to (x +' 2pt,y -' 2pt) |> line-to (x +' 2pt,y +' 2pt) |> line-to (x -' 2pt,y +' 2pt) |> close-with-line)
 
-let colorbox-scheme config frame title-scheme ctx ?:title-txt txt =
+let colorbox-scheme config frame config2 ctx ?:title-txt txt =
   let (is-title-available,title-ib,frame-shift,body-shift,bottom-frame-shift,bottom-body-shift,position) =
     match title-txt with
     | Some(t) -> 
-      let (ib,pos) = title-scheme#make-box config frame ctx t in
-      let (fs,bs,bfs,bbs) = title-scheme#shifts config frame ctx ib in
+      let (ib,pos) = config2#title#make-box config frame ctx t in
+      let (fs,bs,bfs,bbs) = config2#title#shifts config frame ctx ib in
       (true,ib,fs,bs,bfs,bbs,pos)
     | None -> (false,inline-nil,0pt,0pt,0pt,0pt,[])
   in
@@ -178,9 +184,10 @@ let colorbox-scheme config frame title-scheme ctx ?:title-txt txt =
     let (r-path,r-gr) = frame#right-rule config rb rt in
     let (l-path,l-gr) = frame#left-rule config lt lb in
     let back-gr = [fill config#color-back (start-path rt |> t-path |> l-path |> b-path |> r-path |> close-with-line)] in
-    let gr = List.concat [back-gr;t-gr;l-gr;b-gr;r-gr] in
+    let overlay-gr = List.fold-left (fun g o -> List.append g (o config frame 0 pt width height depth)) [] config2#overlay in
+    let gr = List.concat [back-gr;t-gr;l-gr;b-gr;r-gr;overlay-gr] in
     if is-title-available && (exists 0 position) then
-      let title-gr = title-scheme#graphics config frame ctx 0 pt width height depth title-ib in
+      let title-gr = config2#title#graphics config frame ctx 0 pt width height depth title-ib in
       List.append gr title-gr
     else gr
   in
@@ -189,9 +196,10 @@ let colorbox-scheme config frame title-scheme ctx ?:title-txt txt =
     let (l-path,l-gr) = frame#left-rule config lt (x,y -' depth) in
     let (r-path,r-gr) = frame#right-rule config (x +' width, y -' depth) rt in
     let back-gr = [fill config#color-back (start-path (x +' width, y -' depth) |> r-path |> t-path |> l-path |> close-with-line)] in
-    let gr = List.concat [back-gr;r-gr;t-gr;l-gr] in
+    let overlay-gr = List.fold-left (fun g o -> List.append g (o config frame 1 (x,y) width height depth)) [] config2#overlay in
+    let gr = List.concat [back-gr;r-gr;t-gr;l-gr;overlay-gr] in
     if is-title-available && (exists 1 position) then
-      let title-gr = title-scheme#graphics config frame ctx 1 (x,y) width height depth title-ib in
+      let title-gr = config2#title#graphics config frame ctx 1 (x,y) width height depth title-ib in
       List.append gr title-gr
     else gr
   in
@@ -200,9 +208,10 @@ let colorbox-scheme config frame title-scheme ctx ?:title-txt txt =
     let (l-path,l-gr) = frame#left-rule config (x,y +' height) lb in
     let (r-path,r-gr) = frame#right-rule config rb (x +' width,y +' height) in
     let back-gr = [fill config#color-back (start-path (x, y +' height) |> l-path |> b-path |> r-path |> close-with-line)] in
-    let gr = List.concat [back-gr;l-gr;b-gr;r-gr] in
+    let overlay-gr = List.fold-left (fun g o -> List.append g (o config frame 3 (x,y) width height depth)) [] config2#overlay in
+    let gr = List.concat [back-gr;l-gr;b-gr;r-gr;overlay-gr] in
     if is-title-available && (exists 3 position) then
-      let title-gr = title-scheme#graphics config frame ctx 3 (x,y) width height depth title-ib in
+      let title-gr = config2#title#graphics config frame ctx 3 (x,y) width height depth title-ib in
       List.append gr title-gr
     else gr
     
@@ -211,9 +220,10 @@ let colorbox-scheme config frame title-scheme ctx ?:title-txt txt =
     let (l-path,l-gr) = frame#left-rule config (x,y +' height) (x,y -' depth) in
     let (r-path,r-gr) = frame#right-rule config (x +' width,y -' depth) (x +' width,y +' height) in
     let back-gr = [fill config#color-back (start-path (x +' width, y -' depth) |> r-path |> line-to (x,y +' height) |> l-path |> close-with-line);] in
-    let gr = List.concat [back-gr;l-gr;r-gr] in
+    let overlay-gr = List.fold-left (fun g o -> List.append g (o config frame 2 (x,y) width height depth)) [] config2#overlay in
+    let gr = List.concat [back-gr;l-gr;r-gr;overlay-gr] in
     if is-title-available && (exists 2 position) then
-      let title-gr = title-scheme#graphics config frame ctx 2 (x,y) width height depth title-ib in
+      let title-gr = config2#title#graphics config frame ctx 2 (x,y) width height depth title-ib in
       List.append gr title-gr
     else gr
   in
@@ -224,7 +234,6 @@ let colorbox-scheme config frame title-scheme ctx ?:title-txt txt =
       (deco-ro,deco-dougamae,deco-tate2bou,deco-ukebako)
       (fun inctx -> (
         let empty-inline-bb = inline-graphics 10pt 10pt 10pt (fun pt -> []) in
-%        let empty-inline-bb = read-inline inctx {あ} in
         let dummy-bb = line-break false false (set-paragraph-margin 0pt 0pt inctx) (empty-inline-bb ++ inline-fil) in
         let dummy-len = get-natural-length dummy-bb in
         (
@@ -520,7 +529,6 @@ type colorbox-option-data = (|
   % boxrule
   arc: length;
   % outer arc, arc is singular
-  % righttitle etc
   % toggle-left-and-right
   % sharp corners, rounded corners
   % opacity opacityframe etc.
@@ -608,6 +616,7 @@ let make-config option= (|
   top = option#top;
   bottom = option#bottom;
   color-back = option#colback;
+  overlay = [];
 |)
 
 let left l t = (|t with left = l|)
@@ -616,6 +625,8 @@ let top l t = (|t with top = l|)
 let bottom l t = (|t with bottom = l|)
 let toptitle l t = (|t with toptitle = l|)
 let bottomtitle l t = (|t with bottomtitle = l|)
+let lefttitle l t = (|t with lefttitle = l|)
+let righttitle l t = (|t with righttitle = l|)
 let boxsep l t = (|t with boxsep = l|)
 let coltext c t = (|t with coltext = c|)
 let colframe c t = (|t with colframe = c|)
@@ -688,8 +699,9 @@ let-block ctx +colorbox ?:optopt ?:title-txt text =
   let config = make-config opt in
   let frame = make-frame opt#colframe opt in
   let title = make-title opt in
+  let config2 = (|title = title;overlay = [];|) in
   match title-txt with
-  | Some(t) -> colorbox-scheme config frame title ctx ?:t text
-  | None -> colorbox-scheme config frame title ctx text
+  | Some(t) -> colorbox-scheme config frame config2 ctx ?:t text
+  | None -> colorbox-scheme config frame config2 ctx text
 end
 
