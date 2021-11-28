@@ -101,7 +101,7 @@ module Colorbox : sig
     at-bottom: bool;
   |)
   type colorbox-option
-  val +colorbox : [(colorbox-option list)?; inline-text?; block-text] block-cmd
+  val +colorbox : [colorbox-option list; inline-text?; block-text] block-cmd
   val left: length -> colorbox-option
   val right: length -> colorbox-option
   val top: length -> colorbox-option
@@ -526,7 +526,6 @@ type colorbox-option-data = (|
   leftrule: length;
   rightrule: length;
   titlerule: length;
-  % boxrule
   arc: length;
   % outer arc, arc is singular
   % toggle-left-and-right
@@ -657,7 +656,7 @@ let boxtitle-xshift l t = (|t with boxtitle-xshift = l|)
 let boxtitle-yshift l t = (|t with boxtitle-yshift = l|)
 let boxed-title-colframe c t = (|t with boxed-title-colframe = Some(c)|)
 
-let-block ctx +colorbox ?:optopt ?:title-txt text =
+let-block ctx +colorbox option ?:title-txt text =
   let default-option = (|
     left = 4mm;
     right = 4mm;
@@ -691,11 +690,7 @@ let-block ctx +colorbox ?:optopt ?:title-txt text =
     boxed-title-colframe = None;
   |) in
   
-  let opt = 
-    match optopt with 
-    | Some(o) -> List.fold-left (fun t f -> (f t)) default-option o
-    | None -> default-option
-  in
+  let opt = List.fold-left (fun t f -> (f t)) default-option option in
   let config = make-config opt in
   let frame = make-frame opt#colframe opt in
   let title = make-title opt in
