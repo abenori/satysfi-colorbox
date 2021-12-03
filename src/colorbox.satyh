@@ -51,8 +51,10 @@ module Colorbox : sig
   val colorbox-scheme: colorbox-config -> colorbox-frame -> 'a -> context -> inline-text ?-> block-text -> block-boxes
   constraint 'a :: (|
     title: colorbox-title;
-    overlay: (colorbox-config -> colorbox-frame -> int -> (length * length) -> length -> length -> length -> (graphics list)) list;
+    overlay: (colorbox-config -> colorbox-frame -> int -> (length*length) -> length -> length -> length -> (graphics list)) list;
+    shadow: (colorbox-config -> colorbox-frame -> int -> (length*length) -> length -> length -> length -> (graphics list)) list;
   |)
+  val make-frame-path: colorbox-config -> colorbox-frame -> int -> (length*length) -> length -> length -> length -> path
 
   val normal-frame: 'a -> colorbox-frame
   constraint 'a :: (|
@@ -139,11 +141,56 @@ module Colorbox : sig
   val boxtitle-xshift: length -> colorbox-option
   val boxtitle-yshift: length -> colorbox-option
   val boxed-title-colframe: color -> colorbox-option
+  val drop-shadow: colorbox-option
+
 end = struct
 
 % for debug
 let len-to-str l = Float.to-string (Length.to-float l) ^ `pt`
 let draw-point c (x,y) = fill c (start-path (x -' 2pt,y -' 2pt) |> line-to (x +' 2pt,y -' 2pt) |> line-to (x +' 2pt,y +' 2pt) |> line-to (x -' 2pt,y +' 2pt) |> close-with-line)
+
+let make-frame-path config frame index (x,y) width height depth =
+  let top-path = 
+    let (lt-r,lt-b,lt-path,_) = frame#left-top config (x,y +' height) in
+    let (rt-b,rt-l,rt-path,_) = frame#right-top config (x +' width,y +' height) in
+    let (t-path,t-gr) = frame#top-rule config rt-l lt-r in
+    (rt-b,lt-b,(fun p -> p |> rt-path |>  t-path |> lt-path))
+  in
+  let bottom-path =
+    let (lb-t,lb-r,lb-path,_) = frame#left-bottom config (x,y -' depth) in
+    let (rb-l,rb-t,rb-path,_) = frame#right-bottom config (x +' width,y -' depth) in
+    let (b-path,b-gr) = frame#bottom-rule config lb-r rb-l in
+    (lb-t,rb-t,(fun p -> p |> lb-path |> b-path |> rb-path))
+  in
+  if index == 0 then % 口
+    let (t-from,t-to,t-path) = top-path in
+    let (b-from,b-to,b-path) = bottom-path in
+    let (l-path,_) = frame#left-rule config t-to b-from in
+    let (r-path,_) = frame#right-rule config b-to t-from in
+    start-path t-from |> t-path |> l-path |> b-path |> r-path |> close-with-line
+  else if index == 1 then % 冂
+    let (t-from,t-to,t-path) = top-path in
+    let startpt = (x +' width,y -' depth) in
+    let endpt = (x,y -' depth) in
+    let (r-path,_) = frame#right-rule config startpt t-from in
+    let (l-path,_) = frame#left-rule config t-to endpt in
+    start-path startpt |> r-path |> t-path |> l-path |> close-with-line
+  else if index == 2 then % ｜｜
+    let startpt = (x +' width,y -' depth) in
+    let endpt = (x,y -' depth) in
+    let (r-path,_) = frame#right-rule config startpt (x +' width,y +' height) in
+    let (l-path,_) = frame#left-rule config (x,y +' height) endpt in
+    start-path startpt |> r-path |> line-to (x,y +' height) |> l-path |> close-with-line
+  else if index == 3 then % 凵
+    let startpt = (x,y +' height) in
+    let endpt = (x +' width,y +' height) in
+    let (b-from,b-to,b-path) = bottom-path in
+    let (r-path,_) = frame#right-rule config b-to endpt in
+    let (l-path,_) = frame#left-rule config startpt b-from in
+    (start-path startpt |> l-path |> b-path |> r-path |> close-with-line)
+  else 
+    let () = abort-with-message (#`wrong index `# ^ (arabic index) ^ #` in make-frame-path`#) in
+    (start-path (0pt,0pt) |> terminate-path)
 
 let colorbox-scheme config frame config2 ctx ?:title-txt txt =
   let (is-title-available,title-ib,frame-shift,body-shift,bottom-frame-shift,bottom-body-shift,position) =
@@ -169,7 +216,7 @@ let colorbox-scheme config frame config2 ctx ?:title-txt txt =
     let (lb-t,lb-r,lb-path,lb-gr) = frame#left-bottom config (x,y -' depth -' bottom-body-shift) in
     let (rb-l,rb-t,rb-path,rb-gr) = frame#right-bottom config (x +' width,y -' depth -' bottom-body-shift) in
     let (b-path,b-gr) = frame#bottom-rule config lb-r rb-l in
-    let path p = p |> lb-path |> b-path |> rb-path  in
+    let path p = p |> lb-path |> b-path |> rb-path in
     (lb-t,rb-t,path,(List.concat [lb-gr;b-gr;rb-gr]))
   in
   let exists a b = 
@@ -183,50 +230,61 @@ let colorbox-scheme config frame config2 ctx ?:title-txt txt =
     let (lb,rb,b-path,b-gr) = deco-bottom-path pt width height depth in
     let (r-path,r-gr) = frame#right-rule config rb rt in
     let (l-path,l-gr) = frame#left-rule config lt lb in
-    let back-gr = [fill config#color-back (start-path rt |> t-path |> l-path |> b-path |> r-path |> close-with-line)] in
+    let path = start-path rt |> t-path |> l-path |> b-path |> r-path |> close-with-line in
+    let back-gr = [fill config#color-back path] in
+    let shadow-gr =  List.fold-left (fun g o -> List.append g (o config frame 0 pt width height depth)) [] config2#shadow in
     let overlay-gr = List.fold-left (fun g o -> List.append g (o config frame 0 pt width height depth)) [] config2#overlay in
-    let gr = List.concat [back-gr;t-gr;l-gr;b-gr;r-gr;overlay-gr] in
-    if is-title-available && (exists 0 position) then
-      let title-gr = config2#title#graphics config frame ctx 0 pt width height depth title-ib in
-      List.append gr title-gr
-    else gr
+    let title-gr = 
+      if is-title-available && (exists 0 position) then
+        config2#title#graphics config frame ctx 0 pt width height depth title-ib
+      else [] in
+    List.concat [shadow-gr;back-gr;t-gr;l-gr;b-gr;r-gr;title-gr;overlay-gr]
   in
+
   let deco-dougamae (x,y) width height depth = 
     let (rt,lt,t-path,t-gr) = deco-top-path (x,y) width height depth in
     let (l-path,l-gr) = frame#left-rule config lt (x,y -' depth) in
     let (r-path,r-gr) = frame#right-rule config (x +' width, y -' depth) rt in
-    let back-gr = [fill config#color-back (start-path (x +' width, y -' depth) |> r-path |> t-path |> l-path |> close-with-line)] in
+    let path = start-path (x +' width, y -' depth) |> r-path |> t-path |> l-path |> close-with-line in
+    let back-gr = [fill config#color-back path] in
+    let shadow-gr =  List.fold-left (fun g o -> List.append g (o config frame 1 (x,y) width height depth)) [] config2#shadow in
     let overlay-gr = List.fold-left (fun g o -> List.append g (o config frame 1 (x,y) width height depth)) [] config2#overlay in
-    let gr = List.concat [back-gr;r-gr;t-gr;l-gr;overlay-gr] in
-    if is-title-available && (exists 1 position) then
-      let title-gr = config2#title#graphics config frame ctx 1 (x,y) width height depth title-ib in
-      List.append gr title-gr
-    else gr
+    let title-gr = 
+      if is-title-available && (exists 1 position) then
+        config2#title#graphics config frame ctx 1 (x,y) width height depth title-ib
+      else [] in
+    List.concat [shadow-gr;back-gr;r-gr;t-gr;l-gr;title-gr;overlay-gr]
   in
+
   let deco-ukebako (x,y) width height depth =
     let (lb,rb,b-path,b-gr) = deco-bottom-path (x,y) width height depth in
     let (l-path,l-gr) = frame#left-rule config (x,y +' height) lb in
     let (r-path,r-gr) = frame#right-rule config rb (x +' width,y +' height) in
-    let back-gr = [fill config#color-back (start-path (x, y +' height) |> l-path |> b-path |> r-path |> close-with-line)] in
+    let path = start-path (x, y +' height) |> l-path |> b-path |> r-path |> close-with-line in
+    let back-gr = [fill config#color-back path] in
+    let shadow-gr =  List.fold-left (fun g o -> List.append g (o config frame 3 (x,y) width height depth)) [] config2#shadow in
     let overlay-gr = List.fold-left (fun g o -> List.append g (o config frame 3 (x,y) width height depth)) [] config2#overlay in
-    let gr = List.concat [back-gr;l-gr;b-gr;r-gr;overlay-gr] in
-    if is-title-available && (exists 3 position) then
-      let title-gr = config2#title#graphics config frame ctx 3 (x,y) width height depth title-ib in
-      List.append gr title-gr
-    else gr
-    
+    let title-gr =
+      if is-title-available && (exists 3 position) then
+        config2#title#graphics config frame ctx 3 (x,y) width height depth title-ib
+      else [] in
+    List.concat [shadow-gr;back-gr;l-gr;b-gr;r-gr;title-gr;overlay-gr]
   in
+
   let deco-tate2bou (x,y) width height depth = 
     let (l-path,l-gr) = frame#left-rule config (x,y +' height) (x,y -' depth) in
     let (r-path,r-gr) = frame#right-rule config (x +' width,y -' depth) (x +' width,y +' height) in
-    let back-gr = [fill config#color-back (start-path (x +' width, y -' depth) |> r-path |> line-to (x,y +' height) |> l-path |> close-with-line);] in
+    let path = start-path (x +' width, y -' depth) |> r-path |> line-to (x,y +' height) |> l-path |> close-with-line in
+    let back-gr = [fill config#color-back path;] in
+    let shadow-gr =  List.fold-left (fun g o -> List.append g (o config frame 2 (x,y) width height depth)) [] config2#shadow in
     let overlay-gr = List.fold-left (fun g o -> List.append g (o config frame 2 (x,y) width height depth)) [] config2#overlay in
-    let gr = List.concat [back-gr;l-gr;r-gr;overlay-gr] in
-    if is-title-available && (exists 2 position) then
-      let title-gr = config2#title#graphics config frame ctx 2 (x,y) width height depth title-ib in
-      List.append gr title-gr
-    else gr
+    let title-gr =
+      if is-title-available && (exists 2 position) then
+        config2#title#graphics config frame ctx 2 (x,y) width height depth title-ib
+      else [] in
+    List.concat [shadow-gr;back-gr;l-gr;r-gr;title-gr;overlay-gr]
   in
+
   let large-skip = 10000pt in
   let out-block c =
     block-frame-breakable c
@@ -537,6 +595,7 @@ type colorbox-option-data = (|
   boxtitle-xshift: length;
   boxtitle-yshift: length;
   boxed-title-colframe: color option;
+  shadow: colorbox-config -> colorbox-frame -> int -> (length*length) -> length -> length -> length -> (graphics list);
 |)
 type colorbox-option = colorbox-option-data -> colorbox-option-data
 
@@ -615,8 +674,11 @@ let make-config option= (|
   top = option#top;
   bottom = option#bottom;
   color-back = option#colback;
-  overlay = [];
 |)
+
+let shadow-graphic config colbox-config frame index (x,y) width height depth =
+  let path = make-frame-path colbox-config frame index (x +' config#xshift,y +' config#yshift) width height depth in
+  [fill config#color path]
 
 let left l t = (|t with left = l|)
 let right l t = (|t with right = l|)
@@ -655,6 +717,8 @@ let flip-title t = (|t with title-type = title-type-normal-flip|)
 let boxtitle-xshift l t = (|t with boxtitle-xshift = l|)
 let boxtitle-yshift l t = (|t with boxtitle-yshift = l|)
 let boxed-title-colframe c t = (|t with boxed-title-colframe = Some(c)|)
+let drop-shadow t = (|t with shadow = shadow-graphic (|color = (Color.gray 0.8);xshift = 1mm;yshift = -1mm;|)|)
+
 
 let-block ctx +colorbox option ?:title-txt text =
   let default-option = (|
@@ -688,15 +752,20 @@ let-block ctx +colorbox option ?:title-txt text =
     boxtitle-xshift = 0pt;
     boxtitle-yshift = 0pt;
     boxed-title-colframe = None;
+    shadow = (fun _ _ _ _ _ _ _ -> []);
   |) in
   
   let opt = List.fold-left (fun t f -> (f t)) default-option option in
   let config = make-config opt in
   let frame = make-frame opt#colframe opt in
   let title = make-title opt in
-  let config2 = (|title = title;overlay = [];|) in
+  let config2 = (|title = title;overlay = [];shadow = [opt#shadow];|) in
   match title-txt with
   | Some(t) -> colorbox-scheme config frame config2 ctx ?:t text
   | None -> colorbox-scheme config frame config2 ctx text
 end
 
+%(colorbox-config -> colorbox-frame -> int -> (length*length) -> length -> length -> length -> (graphics list)) list;
+%  shadow: colorbox-frame -> int -> (length*length) -> length -> length -> length -> (graphics list);
+%  shadow: colorbox-frame -> int -> (length * length) -> length -> length -> length -> (graphics list);
+%colorbox-frame -> int -> (length*length) -> length -> length -> length -> (graphics list);
