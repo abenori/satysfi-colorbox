@@ -141,7 +141,20 @@ module Colorbox : sig
   val boxtitle-xshift: length -> colorbox-option
   val boxtitle-yshift: length -> colorbox-option
   val boxed-title-colframe: color -> colorbox-option
+  val shadow: length -> length -> length -> 'a -> colorbox-option
+  constraint 'a :: (|
+    color: color;
+  |)
   val drop-shadow: colorbox-option
+  val drop-midday-shadow: colorbox-option
+  val drop-shadow-southeast: colorbox-option
+  val drop-shadow-south: colorbox-option
+  val drop-shadow-southwest: colorbox-option
+  val drop-shadow-west: colorbox-option
+  val drop-shadow-northwest: colorbox-option
+  val drop-shadow-north: colorbox-option
+  val drop-shadow-northeast: colorbox-option
+  val drop-shadow-east: colorbox-option
 
 end = struct
 
@@ -677,7 +690,9 @@ let make-config option= (|
 |)
 
 let shadow-graphic config colbox-config frame index (x,y) width height depth =
-  let path = make-frame-path colbox-config frame index (x +' config#xshift,y +' config#yshift) width height depth in
+  let path = make-frame-path colbox-config frame index 
+    (x +' config#xshift +' config#offset,y +' config#yshift)
+    (width -' config#offset *' 2.0) (height -' config#offset) (depth -' config#offset) in
   [fill config#color path]
 
 let left l t = (|t with left = l|)
@@ -717,8 +732,17 @@ let flip-title t = (|t with title-type = title-type-normal-flip|)
 let boxtitle-xshift l t = (|t with boxtitle-xshift = l|)
 let boxtitle-yshift l t = (|t with boxtitle-yshift = l|)
 let boxed-title-colframe c t = (|t with boxed-title-colframe = Some(c)|)
-let drop-shadow t = (|t with shadow = shadow-graphic (|color = (Color.gray 0.8);xshift = 1mm;yshift = -1mm;|)|)
-
+let shadow x y o c t = (|t with shadow = shadow-graphic (|xshift = x;yshift = y;offset = o;color = c#color;|);|)
+let drop-shadow t = shadow 0.9mm -0.9mm 0mm (|color = (Color.gray 0.75)|) t
+let drop-midday-shadow t = shadow 0mm -0.8mm -0.4mm (|color = (Color.gray 0.75)|) t
+let drop-shadow-southeast t = shadow 0.9mm -0.9mm 0mm (|color = (Color.gray 0.75)|) t
+let drop-shadow-south t = shadow 0mm -0.8mm -0.4mm (|color = (Color.gray 0.75)|) t
+let drop-shadow-southwest t = shadow -0.9mm -0.9mm 0mm (|color = (Color.gray 0.75)|) t
+let drop-shadow-west t = shadow -0.8mm 0mm -0.4mm (|color = (Color.gray 0.75)|) t
+let drop-shadow-northwest t = shadow -0.9mm 0.9mm 0mm (|color = (Color.gray 0.75)|) t
+let drop-shadow-north t = shadow 0mm 0.8mm -0.4mm (|color = (Color.gray 0.75)|) t
+let drop-shadow-northeast t = shadow 0.9mm 0.9mm 0mm (|color = (Color.gray 0.75)|) t
+let drop-shadow-east t = shadow 0.8mm 0mm -0.4mm (|color = (Color.gray 0.75)|) t
 
 let-block ctx +colorbox option ?:title-txt text =
   let default-option = (|
@@ -763,9 +787,8 @@ let-block ctx +colorbox option ?:title-txt text =
   match title-txt with
   | Some(t) -> colorbox-scheme config frame config2 ctx ?:t text
   | None -> colorbox-scheme config frame config2 ctx text
-end
 
-%(colorbox-config -> colorbox-frame -> int -> (length*length) -> length -> length -> length -> (graphics list)) list;
-%  shadow: colorbox-frame -> int -> (length*length) -> length -> length -> length -> (graphics list);
-%  shadow: colorbox-frame -> int -> (length * length) -> length -> length -> length -> (graphics list);
-%colorbox-frame -> int -> (length*length) -> length -> length -> length -> (graphics list);
+
+
+
+end

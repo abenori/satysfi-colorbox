@@ -110,7 +110,7 @@ document (|
       \code(`boxtitle-xshift`);，\code(`boxtitle-yshift`);：length型の引数をとります．ボックス型タイトルが指定されているときのみ有効です．タイトル自身を横方向および縦方向にずらします．
     }
     +p{
-      \code(`drop-shadow`);：影をつけます．
+      \code(`drop-shadow`);：影をつけます．他にも\code(`drop-midday-shadow`);，\code(`drop-shadow-southeast`);，\code(`drop-shadow-south`);，\code(`drop-shadow-southwest`);，\code(`drop-shadow-west`);，\code(`drop-shadow-northwest`);，\code(`drop-shadow-north`);，\code(`drop-shadow-northeast`);，\code(`drop-shadow-east`);があり，指定された方向にずれた影がつきます．
     }
   >
   
