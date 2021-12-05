@@ -81,6 +81,9 @@ document (|
       \code(`arc`);：length型の引数を一つとります．デフォルトでは枠の四隅が四分円になりますが，この半径を指定します．\code(`0pt`);を指定すると丸みがなくなります．
     }
     +p{
+      \code(`sharrp-corners-northwest`);，\code(`sharrp-corners-northeast`);，\code(`sharrp-corners-southwest`);，\code(`sharrp-corners-southeast`);，\code(`sharrp-corners-north`);，\code(`sharrp-corners-south`);，\code(`sharrp-corners-east`);，\code(`sharrp-corners-west`);，\code(`sharrp-corners-downhill`);，\code(`sharrp-corners-uphill`);，\code(`sharrp-corners-all`);：枠の角をとがらせます．
+    }
+    +p{
       \code(`attach-boxed-title-on-top-left`);：引数はありません．以下のようなタイトルの配置ができます．
     }
     +colorbox [attach-boxed-title-on-top-left;] ?:({タイトル}) <+p{中身}>

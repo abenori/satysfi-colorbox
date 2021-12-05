@@ -126,6 +126,17 @@ module Colorbox : sig
   val titlerule: length -> colorbox-option
   val boxrule: length -> colorbox-option
   val arc: length -> colorbox-option
+  val sharrp-corners-northwest: colorbox-option
+  val sharrp-corners-northeast: colorbox-option
+  val sharrp-corners-southwest: colorbox-option
+  val sharrp-corners-southeast: colorbox-option
+  val sharrp-corners-north: colorbox-option
+  val sharrp-corners-south: colorbox-option
+  val sharrp-corners-east: colorbox-option
+  val sharrp-corners-west: colorbox-option
+  val sharrp-corners-downhill: colorbox-option
+  val sharrp-corners-uphill: colorbox-option
+  val sharrp-corners-all: colorbox-option
   val attach-boxed-title-on-top-left: colorbox-option
   val attach-boxed-title-on-top-center: colorbox-option
   val attach-boxed-title-on-top-right: colorbox-option
@@ -694,6 +705,17 @@ let rightrule l t = (|t with rightrule = l|)
 let titlerule l t = (|t with titlerule = l|)
 let boxrule l t = (|t with leftrule = l;rightrule = l;toprule = l;bottomrule = l|)
 let arc l t = (|t with arc = (|left-top = l;right-top = l;left-bottom = l;right-bottom = l;|);|)
+let sharrp-corners-northwest t = (|t with arc = (|t#arc with left-top = 0pt;|);|)
+let sharrp-corners-northeast t = (|t with arc = (|t#arc with right-top = 0pt;|);|)
+let sharrp-corners-southwest t = (|t with arc = (|t#arc with left-bottom = 0pt;|);|)
+let sharrp-corners-southeast t = (|t with arc = (|t#arc with right-bottom = 0pt;|);|)
+let sharrp-corners-north t = (|t with arc = (|t#arc with left-top = 0pt;right-top = 0pt;|);|)
+let sharrp-corners-south t = (|t with arc = (|t#arc with left-bottom = 0pt;right-bottom = 0pt;|);|)
+let sharrp-corners-east t = (|t with arc = (|t#arc with right-top = 0pt;right-bottom = 0pt;|);|)
+let sharrp-corners-west t = (|t with arc = (|t#arc with left-top = 0pt;left-bottom = 0pt;|);|)
+let sharrp-corners-downhill t = (|t with arc = (|t#arc with left-top = 0pt;right-bottom = 0pt;|);|)
+let sharrp-corners-uphill t = (|t with arc = (|t#arc with right-top = 0pt;left-bottom = 0pt;|);|)
+let sharrp-corners-all t = arc 0pt t
 let attach-boxed-title-on-top-left t = (|t with title-type = title-type-boxed-top-left|)
 let attach-boxed-title-on-top-center t = (|t with title-type = title-type-boxed-top-center|)
 let attach-boxed-title-on-top-right t = (|t with title-type = title-type-boxed-top-right|)
