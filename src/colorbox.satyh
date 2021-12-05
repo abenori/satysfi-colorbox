@@ -49,59 +49,54 @@ type colorbox-title = (|
 
 module Colorbox : sig
   val colorbox-scheme: colorbox-config -> colorbox-frame -> 'a -> context -> inline-text ?-> block-text -> block-boxes
-  constraint 'a :: (|
-    title: colorbox-title;
-    overlay: (colorbox-config -> colorbox-frame -> int -> (length*length) -> length -> length -> length -> (graphics list)) list;
-    shadow: (colorbox-config -> colorbox-frame -> int -> (length*length) -> length -> length -> length -> (graphics list)) list;
-  |)
+    constraint 'a :: (|
+      title: colorbox-title;
+      overlay: (colorbox-config -> colorbox-frame -> int -> (length*length) -> length -> length -> length -> (graphics list)) list;
+      shadow: (colorbox-config -> colorbox-frame -> int -> (length*length) -> length -> length -> length -> (graphics list)) list;
+    |)
   val make-frame-path: colorbox-config -> colorbox-frame -> int -> (length*length) -> length -> length -> length -> path
 
-  val normal-frame: 'a -> colorbox-frame
-  constraint 'a :: (|
-    color: color;
-    top-rule: length;
-    bottom-rule: length;
-    right-rule: length;
-    left-rule: length;
-  |)
   val circle-frame: 'a -> colorbox-frame
-  constraint 'a :: (|
-    color: color;
-    top-rule: length;
-    bottom-rule: length;
-    right-rule: length;
-    left-rule: length;
-    radius: length;
-  |)
+    constraint 'a :: (|
+      color: color;
+      top-rule: length;
+      bottom-rule: length;
+      right-rule: length;
+      left-rule: length;
+      left-top-radius: length;
+      right-top-radius: length;
+      left-bottom-radius: length;
+      right-bottom-radius: length;
+    |)
   val normal-title: 'a -> colorbox-title
-  constraint 'a :: (|
-    top: length;
-    bottom: length;
-    left: length;
-    right: length;
-    fonttitle: style list;
-    color: color;
-    color-back: color;
-    bottom-rule: length;
-    color-frame: color;
-    at-bottom: bool;
-  |)
+    constraint 'a :: (|
+      top: length;
+      bottom: length;
+      left: length;
+      right: length;
+      fonttitle: style list;
+      color: color;
+      color-back: color;
+      bottom-rule: length;
+      color-frame: color;
+      at-bottom: bool;
+    |)
   val boxed-title: 'a -> colorbox-title
-  constraint 'a :: (|
-    frame: colorbox-frame;
-    top: length;
-    bottom: length;
-    left: length;
-    right: length;
-    fonttitle: style list;
-    color: color;
-    color-back: color;
-    % height depth
-    shift-x: length -> length -> length;
-    % 枠のwidth objのwidth 
-    shift-y: length -> length -> length;
-    at-bottom: bool;
-  |)
+    constraint 'a :: (|
+      frame: colorbox-frame;
+      top: length;
+      bottom: length;
+      left: length;
+      right: length;
+      fonttitle: style list;
+      color: color;
+      color-back: color;
+      % height depth
+      shift-x: length -> length -> length;
+      % 枠のwidth objのwidth 
+      shift-y: length -> length -> length;
+      at-bottom: bool;
+    |)
   type colorbox-option
   val +colorbox : [colorbox-option list; inline-text?; block-text] block-cmd
   val left: length -> colorbox-option
@@ -142,9 +137,9 @@ module Colorbox : sig
   val boxtitle-yshift: length -> colorbox-option
   val boxed-title-colframe: color -> colorbox-option
   val shadow: length -> length -> length -> 'a -> colorbox-option
-  constraint 'a :: (|
-    color: color;
-  |)
+    constraint 'a :: (|
+      color: color;
+    |)
   val drop-shadow: colorbox-option
   val drop-midday-shadow: colorbox-option
   val drop-shadow-southeast: colorbox-option
@@ -200,10 +195,10 @@ let make-frame-path config frame index (x,y) width height depth =
     let (b-from,b-to,b-path) = bottom-path in
     let (r-path,_) = frame#right-rule config b-to endpt in
     let (l-path,_) = frame#left-rule config startpt b-from in
-    (start-path startpt |> l-path |> b-path |> r-path |> close-with-line)
+    start-path startpt |> l-path |> b-path |> r-path |> close-with-line
   else 
     let () = abort-with-message (#`wrong index `# ^ (arabic index) ^ #` in make-frame-path`#) in
-    (start-path (0pt,0pt) |> terminate-path)
+    start-path (0pt,0pt) |> terminate-path
 
 let colorbox-scheme config frame config2 ctx ?:title-txt txt =
   let (is-title-available,title-ib,frame-shift,body-shift,bottom-frame-shift,bottom-body-shift,position) =
@@ -339,17 +334,6 @@ let normal-rule thickness color cfg from to =
       [stroke thickness color (start-path from |> line-to to |> terminate-path)]
     else []
   )
-let normal-corner cfg pt = (pt,pt,(fun p -> p),[])
-let normal-frame config = (|
-  left-top = normal-corner;
-  right-top = normal-corner;
-  left-bottom = normal-corner;
-  right-bottom = normal-corner;
-  top-rule = normal-rule config#top-rule config#color;
-  bottom-rule = normal-rule config#bottom-rule config#color;
-  left-rule = normal-rule config#left-rule config#color;
-  right-rule = normal-rule config#right-rule config#color;
-|)
 
 let get-stroke-frame-corner-transform from-rule to-rule angle (from-x,from-y) (to-x,to-y) =
   let (c,s) = (cos (angle *. 3.14159 /. 180.0),sin (angle *. 3.14159 /. 180.0)) in
@@ -386,41 +370,35 @@ let circle-frame-corner-path angle radius (x,y) =
     (enx,eny)
   )
 
-let circle-frame-corner-graphics frame-config angle config (x,y) =
-  let (from-rule,to-rule) =
-    if Float.(angle == 0.0) then (frame-config#right-rule,frame-config#top-rule)
-    else if Float.(angle == 90.0) then (frame-config#top-rule,frame-config#left-rule)
-    else if Float.(angle == 180.0) then (frame-config#left-rule,frame-config#bottom-rule)
-    else if Float.(angle == 270.0) then (frame-config#bottom-rule,frame-config#right-rule)
-    else 
-      % BUG
-      let () = abort-with-message (#`invalid angle `# ^ (Float.to-string angle) ^ #` in circle-frame-corner-graphics, may be a bug`#) in
-      (0pt,0pt)
-  in
-  let (from,ctrl1,ctrl2,to) = circle-frame-corner-path angle frame-config#radius (x,y) in
+let circle-frame-corner-graphics-aux from-rule to-rule radius color angle config (x,y) =
+  let (from,ctrl1,ctrl2,to) = circle-frame-corner-path angle radius (x,y) in
   let path = bezier-to ctrl1 ctrl2 to in
   let gr =
     if Length.(from-rule == 0pt) && Length.(to-rule == 0pt) then []
     else
       if Length.(from-rule == to-rule) then 
-        [stroke from-rule frame-config#color (start-path from |>  path |> terminate-path)]
+        [stroke from-rule color (start-path from |>  path |> terminate-path)]
       else 
         let (trans-i,trans-o) = get-stroke-frame-corner-transform from-rule to-rule angle from to in
         let (from-i,ctrl1-i,ctrl2-i,to-i) = (trans-i from,trans-i ctrl1,trans-i ctrl2,trans-i to) in
         let (from-o,ctrl1-o,ctrl2-o,to-o) = (trans-o from,trans-o ctrl1,trans-o ctrl2,trans-o to) in
-        [fill frame-config#color (start-path from-o |> bezier-to ctrl1-o ctrl2-o to-o |> line-to to-i |> bezier-to ctrl2-i ctrl1-i from-i |> close-with-line)]
+        [fill color (start-path from-o |> bezier-to ctrl1-o ctrl2-o to-o |> line-to to-i |> bezier-to ctrl2-i ctrl1-i from-i |> close-with-line)]
   in
   (from,to,path,gr)
 
-let circle-frame frame-config = (|
-  right-top = circle-frame-corner-graphics frame-config 0.0;
-  left-top = circle-frame-corner-graphics frame-config 90.0;
-  left-bottom = circle-frame-corner-graphics frame-config 180.0;
-  right-bottom = circle-frame-corner-graphics frame-config 270.0;
-  top-rule = normal-rule frame-config#top-rule frame-config#color;
-  bottom-rule = normal-rule frame-config#bottom-rule frame-config#color;
-  left-rule = normal-rule frame-config#left-rule frame-config#color;
-  right-rule = normal-rule frame-config#right-rule frame-config#color;
+let circle-frame-corner-graphics from-rule to-rule radius color angle config pt =
+  if Length.(radius == 0pt) then (pt,pt,(fun p -> p),[])
+  else circle-frame-corner-graphics-aux from-rule to-rule radius color angle config pt
+
+let circle-frame fc = (|
+  right-top = circle-frame-corner-graphics fc#right-rule fc#top-rule fc#right-top-radius fc#color 0.0;
+  left-top = circle-frame-corner-graphics fc#top-rule fc#top-rule fc#left-top-radius fc#color 90.0;
+  left-bottom = circle-frame-corner-graphics fc#left-rule fc#bottom-rule fc#left-bottom-radius fc#color 180.0;
+  right-bottom = circle-frame-corner-graphics fc#bottom-rule fc#right-rule fc#right-bottom-radius fc#color 270.0;
+  top-rule = normal-rule fc#top-rule fc#color;
+  bottom-rule = normal-rule fc#bottom-rule fc#color;
+  left-rule = normal-rule fc#left-rule fc#color;
+  right-rule = normal-rule fc#right-rule fc#color;
 |)
 
 let normal-title-make-box title-config config frame ctx title-it =
@@ -597,7 +575,7 @@ type colorbox-option-data = (|
   leftrule: length;
   rightrule: length;
   titlerule: length;
-  arc: length;
+  arc: (|left-top: length;right-top: length;left-bottom: length;right-bottom: length;|);
   % outer arc, arc is singular
   % toggle-left-and-right
   % sharp corners, rounded corners
@@ -613,23 +591,17 @@ type colorbox-option-data = (|
 type colorbox-option = colorbox-option-data -> colorbox-option-data
 
 let make-frame color option =
-  if Length.(option#arc == 0pt) then
-    normal-frame (|
-      color = color;
-      top-rule = option#toprule;
-      bottom-rule = option#bottomrule;
-      right-rule = option#rightrule;
-      left-rule = option#leftrule;
-    |)
-  else
-    circle-frame (|
-      color = color;
-      top-rule = option#toprule;
-      bottom-rule = option#bottomrule;
-      right-rule = option#rightrule;
-      left-rule = option#leftrule;
-      radius = option#arc;
-    |)
+  circle-frame (|
+    color = color;
+    top-rule = option#toprule;
+    bottom-rule = option#bottomrule;
+    right-rule = option#rightrule;
+    left-rule = option#leftrule;
+    right-top-radius = option#arc#right-top;
+    left-top-radius = option#arc#left-top;
+    left-bottom-radius = option#arc#left-bottom;
+    right-bottom-radius = option#arc#right-bottom;
+  |)
 
 let make-title option =
   if option#title-type == title-type-normal || option#title-type == title-type-normal-flip then
@@ -721,7 +693,7 @@ let leftrule l t = (|t with leftrule = l|)
 let rightrule l t = (|t with rightrule = l|)
 let titlerule l t = (|t with titlerule = l|)
 let boxrule l t = (|t with leftrule = l;rightrule = l;toprule = l;bottomrule = l|)
-let arc l t = (|t with arc = l;|)
+let arc l t = (|t with arc = (|left-top = l;right-top = l;left-bottom = l;right-bottom = l;|);|)
 let attach-boxed-title-on-top-left t = (|t with title-type = title-type-boxed-top-left|)
 let attach-boxed-title-on-top-center t = (|t with title-type = title-type-boxed-top-center|)
 let attach-boxed-title-on-top-right t = (|t with title-type = title-type-boxed-top-right|)
@@ -772,7 +744,7 @@ let-block ctx +colorbox option ?:title-txt text =
     leftrule = 0.5mm;
     rightrule = 0.5mm;
     titlerule = 0.5mm;
-    arc = 1mm;
+    arc = (|left-top = 1mm;right-top = 1mm;left-bottom = 1mm;right-bottom = 1mm;|);
     boxtitle-xshift = 0pt;
     boxtitle-yshift = 0pt;
     boxed-title-colframe = None;

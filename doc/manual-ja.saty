@@ -308,5 +308,73 @@ document (|
       }
     >
   >
-  
+  +section{用意されている枠とタイトル}<
+    +subsection{circle-frame}<
+      +p{
+        四隅が丸くなる枠です．次のように使います
+      }
+      +code(``
+        Colorbox.circle-frame (|
+          color = Color.red; % 枠の色
+          top-rule = 1mm; % 上の枠の太さ
+          bottom-rule = 1mm; % 下の枠の太さ
+          right-rule = 1mm; % 右の枠の太さ
+          left-rule = 1mm; % 左の枠の太さ
+          left-top-radius = 3mm; % 左上隅の枠の半径
+          right-top-radius = 3mm; % 右上隅の枠の半径
+          left-bottom-radius = 5mm; % 左下隅の枠の半径
+          right-bottom-radius = 5mm; % 右下隅の枠の半径
+        |)
+      ``);
+    >
+    +subsection{normal-title}<
+      +p{
+        上下に出てくるタイトルです．\code(`+colorbox`);のデフォルトです．次のように使います．
+      }
+      +code(``
+        normal-title (|
+          top = 1mm; % 上空き
+          bottom = 1mm; % 下空き
+          left = 1mm; % 左空き
+          right = 1mm; % 右空き
+          fonttitle = [bold] % タイトルのフォント指定．satysfi-fssのstyle list
+          color = Color.blue; % タイトルの文字色
+          color-back = Color.black: % 背景色
+          bottom-rule = 1mm; % タイトルと本文を区切る枠の太さ
+          color-frame = Color.red; % タイトル周りの枠の色
+          at-bottom = true; % 枠の下にタイトルをおくかどうか
+        |)
+      ``);
+    >
+    +subsection{boxed-title}<
+      +p{
+        枠に囲まれて独立に出るタイトルです．\code(`attached-boxed-title-top-left`);などで出てくるやつです．
+        次のように使います．
+      }
+      +code(``
+        boxed-title (|
+          frame = ...; % 枠指定．colorbox-schemeの第二引数と同様
+          top = 1mm; % 上空き
+          bottom = 1mm; % 下空き
+          left = 1mm; % 左空き
+          right = 1mm; % 右空き
+          fonttitle = [bold] % タイトルのフォント指定．satysfi-fssのstyle list
+          color = Color.blue; % タイトルの文字色
+          color-back = Color.black: % 背景色
+          shift-x = ... % 横方向のずらし．後で説明．
+          shift-y = ... % 縦方向のずらし．後で説明．
+          at-bottom = true; % 枠の下にタイトルをおくかどうか
+        |);
+      ``);
+      +p{
+        \code(`shift-x`);には枠全体の横方向のずらし量を指定します．
+        右方向が正です．
+        これは\code(`length -> length -> length`);という形の関数を指定します．
+        第一引数に枠自身の幅，第二引数にタイトルの幅が渡されて呼び出されます．
+        \code(`shift-y`);は枠全体の縦方向のずらし量を指定します．
+        上方向が正です．
+        同様に\code(`length -> length -> length`);という形の関数ですが，第一引数にはタイトルの高さ，第二引数にはタイトルの深さが与えられて呼び出されます．
+      }
+    >
+  >
 >
