@@ -115,6 +115,24 @@ document (|
     +p{
       \code(`drop-shadow`);：影をつけます．他にも\code(`drop-midday-shadow`);，\code(`drop-shadow-southeast`);，\code(`drop-shadow-south`);，\code(`drop-shadow-southwest`);，\code(`drop-shadow-west`);，\code(`drop-shadow-northwest`);，\code(`drop-shadow-north`);，\code(`drop-shadow-northeast`);，\code(`drop-shadow-east`);があり，指定された方向にずれた影がつきます．
     }
+    +p{
+      \code(`watermark-text`);\code(`watermark-text-on-broken`);\code(`watermark-text-on-unbroken`);\code(`watermark-text-on-first`);\code(`watermark-text-on-middle`);\code(`watermark-text-on-last`);\code(`watermark-text-on-unbroken-and-first`);\code(`watermark-text-on-middle-and-last`);\code(`watermark-text-on-first-and-middle`);：透かしを入れます．\code(`inline-text`);を指定します．二つ目以降はどの枠に出力するかの指定です．\code(`unbroken`);がページで分割されていない枠です．\code(`broken`);は分割された枠．\code(`first`);はページで分割された枠の最初のページ，\code(`last`);が最後，\code(`middle`);がその他です．どの枠かの指定を含めた命令は，関係ない部分には影響を与えません．例えば次のような例を考えてみます．
+    }
+    +code(``
+    [
+      Colorbox.watermark-text {あ};
+      Colorbox.watermark-text-first {い};
+    ]
+    ``);
+    +p{
+      このとき分割された枠の2ページ目には「い」が透かしとして入ります．
+    }
+    +p{
+      \code(`watermark-zoom`);：浮動小数を一つ引数にとります．透かしの大きさを，枠の大きさに対する相対的な大きさで指定します．
+    }
+    +p{
+      \code(`watermark-color`);：色を一つ引数にとります．透かしの色を指定します．
+    }
   >
   
   +section{低レベルな命令}<

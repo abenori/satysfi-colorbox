@@ -51,10 +51,10 @@ module Colorbox : sig
   val colorbox-scheme: colorbox-config -> colorbox-frame -> 'a -> context -> inline-text ?-> block-text -> block-boxes
     constraint 'a :: (|
       title: colorbox-title;
-      overlay: (colorbox-config -> colorbox-frame -> int -> (length*length) -> length -> length -> length -> (graphics list)) list;
-      shadow: (colorbox-config -> colorbox-frame -> int -> (length*length) -> length -> length -> length -> (graphics list)) list;
+      overlay: (colorbox-config -> colorbox-frame -> context -> int -> (length*length) -> length -> length -> length -> (graphics list)) list;
+      shadow: (colorbox-config -> colorbox-frame -> context -> int -> (length*length) -> length -> length -> length -> (graphics list)) list;
     |)
-  val make-frame-path: colorbox-config -> colorbox-frame -> int -> (length*length) -> length -> length -> length -> path
+  val make-frame: colorbox-config -> colorbox-frame -> int -> (length*length) -> length -> length -> length -> (path * graphics list)
 
   val circle-frame: 'a -> colorbox-frame
     constraint 'a :: (|
@@ -161,6 +161,17 @@ module Colorbox : sig
   val drop-shadow-north: colorbox-option
   val drop-shadow-northeast: colorbox-option
   val drop-shadow-east: colorbox-option
+  val watermark-text: inline-text -> colorbox-option
+  val watermark-text-on-broken: inline-text -> colorbox-option
+  val watermark-text-on-unbroken: inline-text -> colorbox-option
+  val watermark-text-on-first: inline-text -> colorbox-option
+  val watermark-text-on-middle: inline-text -> colorbox-option
+  val watermark-text-on-last: inline-text -> colorbox-option
+  val watermark-text-on-unbroken-and-first: inline-text -> colorbox-option
+  val watermark-text-on-middle-and-last: inline-text -> colorbox-option
+  val watermark-text-on-first-and-middle: inline-text -> colorbox-option
+  val watermark-zoom: float -> colorbox-option
+  val watermark-color: color -> colorbox-option
 
 end = struct
 
@@ -168,48 +179,48 @@ end = struct
 let len-to-str l = Float.to-string (Length.to-float l) ^ `pt`
 let draw-point c (x,y) = fill c (start-path (x -' 2pt,y -' 2pt) |> line-to (x +' 2pt,y -' 2pt) |> line-to (x +' 2pt,y +' 2pt) |> line-to (x -' 2pt,y +' 2pt) |> close-with-line)
 
-let make-frame-path config frame index (x,y) width height depth =
+let make-frame config frame index (x,y) width height depth =
   let top-path = 
-    let (lt-r,lt-b,lt-path,_) = frame#left-top config (x,y +' height) in
-    let (rt-b,rt-l,rt-path,_) = frame#right-top config (x +' width,y +' height) in
+    let (lt-r,lt-b,lt-path,lt-gr) = frame#left-top config (x,y +' height) in
+    let (rt-b,rt-l,rt-path,rt-gr) = frame#right-top config (x +' width,y +' height) in
     let (t-path,t-gr) = frame#top-rule config rt-l lt-r in
-    (rt-b,lt-b,(fun p -> p |> rt-path |>  t-path |> lt-path))
+    (rt-b,lt-b,(fun p -> p |> rt-path |>  t-path |> lt-path),List.concat [rt-gr;t-gr;lt-gr])
   in
   let bottom-path =
-    let (lb-t,lb-r,lb-path,_) = frame#left-bottom config (x,y -' depth) in
-    let (rb-l,rb-t,rb-path,_) = frame#right-bottom config (x +' width,y -' depth) in
+    let (lb-t,lb-r,lb-path,lb-gr) = frame#left-bottom config (x,y -' depth) in
+    let (rb-l,rb-t,rb-path,rb-gr) = frame#right-bottom config (x +' width,y -' depth) in
     let (b-path,b-gr) = frame#bottom-rule config lb-r rb-l in
-    (lb-t,rb-t,(fun p -> p |> lb-path |> b-path |> rb-path))
+    (lb-t,rb-t,(fun p -> p |> lb-path |> b-path |> rb-path),List.concat [lb-gr;b-gr;rb-gr])
   in
   if index == 0 then % 口
-    let (t-from,t-to,t-path) = top-path in
-    let (b-from,b-to,b-path) = bottom-path in
-    let (l-path,_) = frame#left-rule config t-to b-from in
-    let (r-path,_) = frame#right-rule config b-to t-from in
-    start-path t-from |> t-path |> l-path |> b-path |> r-path |> close-with-line
+    let (t-from,t-to,t-path,t-gr) = top-path in
+    let (b-from,b-to,b-path,b-gr) = bottom-path in
+    let (l-path,l-gr) = frame#left-rule config t-to b-from in
+    let (r-path,r-gr) = frame#right-rule config b-to t-from in
+    (start-path t-from |> t-path |> l-path |> b-path |> r-path |> close-with-line,List.concat [t-gr;l-gr;b-gr;r-gr])
   else if index == 1 then % 冂
-    let (t-from,t-to,t-path) = top-path in
+    let (t-from,t-to,t-path,t-gr) = top-path in
     let startpt = (x +' width,y -' depth) in
     let endpt = (x,y -' depth) in
-    let (r-path,_) = frame#right-rule config startpt t-from in
-    let (l-path,_) = frame#left-rule config t-to endpt in
-    start-path startpt |> r-path |> t-path |> l-path |> close-with-line
+    let (r-path,r-gr) = frame#right-rule config startpt t-from in
+    let (l-path,l-gr) = frame#left-rule config t-to endpt in
+    (start-path startpt |> r-path |> t-path |> l-path |> close-with-line,List.concat [r-gr;t-gr;l-gr])
   else if index == 2 then % ｜｜
     let startpt = (x +' width,y -' depth) in
     let endpt = (x,y -' depth) in
-    let (r-path,_) = frame#right-rule config startpt (x +' width,y +' height) in
-    let (l-path,_) = frame#left-rule config (x,y +' height) endpt in
-    start-path startpt |> r-path |> line-to (x,y +' height) |> l-path |> close-with-line
+    let (r-path,r-gr) = frame#right-rule config startpt (x +' width,y +' height) in
+    let (l-path,l-gr) = frame#left-rule config (x,y +' height) endpt in
+    (start-path startpt |> r-path |> line-to (x,y +' height) |> l-path |> close-with-line,List.append r-gr l-gr)
   else if index == 3 then % 凵
     let startpt = (x,y +' height) in
     let endpt = (x +' width,y +' height) in
-    let (b-from,b-to,b-path) = bottom-path in
-    let (r-path,_) = frame#right-rule config b-to endpt in
-    let (l-path,_) = frame#left-rule config startpt b-from in
-    start-path startpt |> l-path |> b-path |> r-path |> close-with-line
+    let (b-from,b-to,b-path,b-gr) = bottom-path in
+    let (r-path,r-gr) = frame#right-rule config b-to endpt in
+    let (l-path,l-gr) = frame#left-rule config startpt b-from in
+    (start-path startpt |> l-path |> b-path |> r-path |> close-with-line,List.concat [l-gr;b-gr;r-gr])
   else 
-    let () = abort-with-message (#`wrong index `# ^ (arabic index) ^ #` in make-frame-path`#) in
-    start-path (0pt,0pt) |> terminate-path
+    let () = abort-with-message (#`wrong index `# ^ (arabic index) ^ #` in make-frame`#) in
+    (start-path (0pt,0pt) |> terminate-path,[])
 
 let colorbox-scheme config frame config2 ctx ?:title-txt txt =
   let (is-title-available,title-ib,frame-shift,body-shift,bottom-frame-shift,bottom-body-shift,position) =
@@ -251,8 +262,8 @@ let colorbox-scheme config frame config2 ctx ?:title-txt txt =
     let (l-path,l-gr) = frame#left-rule config lt lb in
     let path = start-path rt |> t-path |> l-path |> b-path |> r-path |> close-with-line in
     let back-gr = [fill config#color-back path] in
-    let shadow-gr =  List.fold-left (fun g o -> List.append g (o config frame 0 pt width height depth)) [] config2#shadow in
-    let overlay-gr = List.fold-left (fun g o -> List.append g (o config frame 0 pt width height depth)) [] config2#overlay in
+    let shadow-gr =  List.fold-left (fun g o -> List.append g (o config frame ctx 0 pt width height depth)) [] config2#shadow in
+    let overlay-gr = List.fold-left (fun g o -> List.append g (o config frame ctx 0 pt width height depth)) [] config2#overlay in
     let title-gr = 
       if is-title-available && (exists 0 position) then
         config2#title#graphics config frame ctx 0 pt width height depth title-ib
@@ -266,8 +277,8 @@ let colorbox-scheme config frame config2 ctx ?:title-txt txt =
     let (r-path,r-gr) = frame#right-rule config (x +' width, y -' depth) rt in
     let path = start-path (x +' width, y -' depth) |> r-path |> t-path |> l-path |> close-with-line in
     let back-gr = [fill config#color-back path] in
-    let shadow-gr =  List.fold-left (fun g o -> List.append g (o config frame 1 (x,y) width height depth)) [] config2#shadow in
-    let overlay-gr = List.fold-left (fun g o -> List.append g (o config frame 1 (x,y) width height depth)) [] config2#overlay in
+    let shadow-gr =  List.fold-left (fun g o -> List.append g (o config frame ctx 1 (x,y) width height depth)) [] config2#shadow in
+    let overlay-gr = List.fold-left (fun g o -> List.append g (o config frame ctx 1 (x,y) width height depth)) [] config2#overlay in
     let title-gr = 
       if is-title-available && (exists 1 position) then
         config2#title#graphics config frame ctx 1 (x,y) width height depth title-ib
@@ -281,8 +292,8 @@ let colorbox-scheme config frame config2 ctx ?:title-txt txt =
     let (r-path,r-gr) = frame#right-rule config rb (x +' width,y +' height) in
     let path = start-path (x, y +' height) |> l-path |> b-path |> r-path |> close-with-line in
     let back-gr = [fill config#color-back path] in
-    let shadow-gr =  List.fold-left (fun g o -> List.append g (o config frame 3 (x,y) width height depth)) [] config2#shadow in
-    let overlay-gr = List.fold-left (fun g o -> List.append g (o config frame 3 (x,y) width height depth)) [] config2#overlay in
+    let shadow-gr =  List.fold-left (fun g o -> List.append g (o config frame ctx 3 (x,y) width height depth)) [] config2#shadow in
+    let overlay-gr = List.fold-left (fun g o -> List.append g (o config frame ctx 3 (x,y) width height depth)) [] config2#overlay in
     let title-gr =
       if is-title-available && (exists 3 position) then
         config2#title#graphics config frame ctx 3 (x,y) width height depth title-ib
@@ -295,8 +306,8 @@ let colorbox-scheme config frame config2 ctx ?:title-txt txt =
     let (r-path,r-gr) = frame#right-rule config (x +' width,y -' depth) (x +' width,y +' height) in
     let path = start-path (x +' width, y -' depth) |> r-path |> line-to (x,y +' height) |> l-path |> close-with-line in
     let back-gr = [fill config#color-back path;] in
-    let shadow-gr =  List.fold-left (fun g o -> List.append g (o config frame 2 (x,y) width height depth)) [] config2#shadow in
-    let overlay-gr = List.fold-left (fun g o -> List.append g (o config frame 2 (x,y) width height depth)) [] config2#overlay in
+    let shadow-gr =  List.fold-left (fun g o -> List.append g (o config frame ctx 2 (x,y) width height depth)) [] config2#shadow in
+    let overlay-gr = List.fold-left (fun g o -> List.append g (o config frame ctx 2 (x,y) width height depth)) [] config2#overlay in
     let title-gr =
       if is-title-available && (exists 2 position) then
         config2#title#graphics config frame ctx 2 (x,y) width height depth title-ib
@@ -597,11 +608,14 @@ type colorbox-option-data = (|
   boxtitle-xshift: length;
   boxtitle-yshift: length;
   boxed-title-colframe: color option;
-  shadow: colorbox-config -> colorbox-frame -> int -> (length*length) -> length -> length -> length -> (graphics list);
+  shadow: colorbox-config -> colorbox-frame -> context -> int -> (length*length) -> length -> length -> length -> (graphics list);
+  watermark: (|unbroken: inline-text;first: inline-text;middle: inline-text;last: inline-text;|);
+  watermark-zoom: float;
+  watermark-color: color;
 |)
 type colorbox-option = colorbox-option-data -> colorbox-option-data
 
-let make-frame color option =
+let make-colorbox-frame color option =
   circle-frame (|
     color = color;
     top-rule = option#toprule;
@@ -630,7 +644,7 @@ let make-title option =
     |)
   else
     let frame =
-      make-frame (match option#boxed-title-colframe with |None -> option#colframe |Some(c) ->c) option in
+      make-colorbox-frame (match option#boxed-title-colframe with |None -> option#colframe |Some(c) ->c) option in
     let shift-x = 
       if option#title-type == title-type-boxed-top-left || option#title-type == title-type-boxed-bottom-left then
         (fun _ _ -> option#boxtitle-xshift) % left
@@ -672,8 +686,20 @@ let make-config option= (|
   color-back = option#colback;
 |)
 
-let shadow-graphic config colbox-config frame index (x,y) width height depth =
-  let path = make-frame-path colbox-config frame index 
+let watermark-graphic zoom color txt colbox-config frame ctx index (x,y) width height depth =
+  let ib = read-inline (set-text-color color ctx) txt in
+  let (w,h,d) = get-natural-metrics ib in
+  let ratiox = (width *' zoom) /' w in
+  let ratioy = ((height +' depth) *' zoom) /' (h +' d) in
+  let ratio = if Float.(ratiox < ratioy) then ratiox else ratioy in
+  let txt-x = x +' (width -' (w *' ratio)) *' 0.5 in
+  let txt-y = y +' ((height -' depth) -' ((h -' d) *' ratio)) *' 0.5 in
+  [
+    shift-graphics (txt-x,txt-y) (linear-transform-graphics ratio 0.0 0.0 ratio (draw-text (0pt,0pt) ib))
+  ]
+
+let shadow-graphic config colbox-config frame ctx index (x,y) width height depth =
+  let (path,_) = make-frame colbox-config frame index 
     (x +' config#xshift +' config#offset,y +' config#yshift)
     (width -' config#offset *' 2.0) (height -' config#offset) (depth -' config#offset) in
   [fill config#color path]
@@ -737,6 +763,17 @@ let drop-shadow-northwest t = shadow -0.9mm 0.9mm 0mm (|color = (Color.gray 0.75
 let drop-shadow-north t = shadow 0mm 0.8mm -0.4mm (|color = (Color.gray 0.75)|) t
 let drop-shadow-northeast t = shadow 0.9mm 0.9mm 0mm (|color = (Color.gray 0.75)|) t
 let drop-shadow-east t = shadow 0.8mm 0mm -0.4mm (|color = (Color.gray 0.75)|) t
+let watermark-text txt t = (|t with watermark = (|unbroken = txt;first = txt;middle = txt;last = txt;|);|)
+let watermark-text-on-unbroken txt t = (|t with watermark = (|t#watermark with unbroken = txt;|);|)
+let watermark-text-on-broken txt t = (|t with watermark = (|t#watermark with first = txt;middle = txt;last = txt;|);|)
+let watermark-text-on-first txt t = (|t with watermark = (|t#watermark with first = txt;|);|)
+let watermark-text-on-middle txt t = (|t with watermark = (|t#watermark with middle = txt;|);|)
+let watermark-text-on-last txt t = (|t with watermark = (|t#watermark with last = txt;|);|)
+let watermark-text-on-unbroken-and-first txt t = (|t with watermark = (|t#watermark with unbroken = txt;first = txt;|);|)
+let watermark-text-on-middle-and-last txt t = (|t with watermark = (|t#watermark with middle = txt;last = txt;|);|)
+let watermark-text-on-first-and-middle txt t = (|t with watermark = (|t#watermark with first = txt;middle = txt;|);|)
+let watermark-zoom f t = (|t with watermark-zoom = f;|)
+let watermark-color c t = (|t with watermark-color = c;|)
 
 let-block ctx +colorbox option ?:title-txt text =
   let default-option = (|
@@ -770,14 +807,30 @@ let-block ctx +colorbox option ?:title-txt text =
     boxtitle-xshift = 0pt;
     boxtitle-yshift = 0pt;
     boxed-title-colframe = None;
-    shadow = (fun _ _ _ _ _ _ _ -> []);
+    shadow = (fun _ _ _ _ _ _ _ _ -> []);
+    watermark = (|unbroken = {};first = {};middle = {};last = {};|);
+    watermark-zoom = 0.75;
+    watermark-color = Color.gray 0.85;
   |) in
   
   let opt = List.fold-left (fun t f -> (f t)) default-option option in
   let config = make-config opt in
-  let frame = make-frame opt#colframe opt in
+  let frame = make-colorbox-frame opt#colframe opt in
   let title = make-title opt in
-  let config2 = (|title = title;overlay = [];shadow = [opt#shadow];|) in
+  let watermark cfg frame ctx index pt width height depth =
+    if index == 0 then
+      watermark-graphic opt#watermark-zoom opt#watermark-color opt#watermark#unbroken cfg frame ctx index pt width height depth
+    else if index == 1 then
+      watermark-graphic opt#watermark-zoom opt#watermark-color opt#watermark#first cfg frame ctx index pt width height depth
+    else if index == 2 then
+      watermark-graphic opt#watermark-zoom opt#watermark-color opt#watermark#middle cfg frame ctx index pt width height depth
+    else if index == 3 then
+      watermark-graphic opt#watermark-zoom opt#watermark-color opt#watermark#last cfg frame ctx index pt width height depth
+    else 
+      let () = abort-with-message (#`wrong index `# ^ (arabic index) ^ #` in watermark, may be a bug`#) in
+      []
+  in
+  let config2 = (|title = title;overlay = [watermark];shadow = [opt#shadow];|) in
   match title-txt with
   | Some(t) -> colorbox-scheme config frame config2 ctx ?:t text
   | None -> colorbox-scheme config frame config2 ctx text
