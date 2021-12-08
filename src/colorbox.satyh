@@ -408,9 +408,16 @@ let circle-frame-corner-graphics-aux from-rule to-rule radius color angle config
   in
   (from,to,path,gr)
 
-let circle-frame-corner-graphics from-rule to-rule radius color angle config pt =
-  if Length.(radius == 0pt) then (pt,pt,(fun p -> p),[])
-  else circle-frame-corner-graphics-aux from-rule to-rule radius color angle config pt
+let circle-frame-corner-graphics from-rule to-rule radius color angle config (x,y) =
+  if Length.(radius == 0pt) then
+    let (c,s) = (cos (angle *. 3.14159 /. 180.0),sin (angle *. 3.14159 /. 180.0)) in
+    let (haba-x,haba-y) = ((from-rule *' c +' to-rule *' s) *' 0.5,(from-rule *' s +' to-rule *' c) *' 0.5) in
+    let path = start-path (x +' haba-x,y -' haba-y)
+        |> line-to (x +' haba-x,y +' haba-y) |> line-to (x -' haba-x,y +' haba-y)
+        |> line-to (x -' haba-x,y -' haba-y) |> close-with-line
+    in
+    ((x,y),(x,y),(fun p -> p),[fill color  path])
+  else circle-frame-corner-graphics-aux from-rule to-rule radius color angle config (x,y)
 
 let circle-frame fc = (|
   right-top = circle-frame-corner-graphics fc#right-rule fc#top-rule fc#right-top-radius fc#color 0.0;

@@ -2,10 +2,6 @@
 @require: enumitem/enumitem
 @import: ../src/colorbox
 
-open Colorbox
-
-in
-
 document (|
   title = {Colorbox};
   author = {Noriyuki Abe};
@@ -13,7 +9,7 @@ document (|
   show-toc = false;
 |) '<
   +section{基本的な使い方}<
-    +colorbox [] ?:({Colorbox})<
+    +Colorbox.colorbox [] ?:({Colorbox})<
       +p{
         このような枠囲みを実現するためのパッケージです．
       }
@@ -32,8 +28,8 @@ document (|
     +p{
       これで次のような出力を得ます．
     }
-    +colorbox [
-      top 5mm;% 設定
+    +Colorbox.colorbox [
+      Colorbox.top 5mm;% 設定
     ] ?:({タイトル}) <
       +p{ 上に5mmの空き．枠に囲まれた文章． }
     >
@@ -86,7 +82,7 @@ document (|
     +p{
       \code(`attach-boxed-title-on-top-left`);：引数はありません．以下のようなタイトルの配置ができます．
     }
-    +colorbox [attach-boxed-title-on-top-left;] ?:({タイトル}) <+p{中身}>
+    +Colorbox.colorbox [Colorbox.attach-boxed-title-on-top-left;] ?:({タイトル}) <+p{中身}>
     +p{
       これは次のコードにより得られます．以下このような形のタイトルをボックス型タイトルと呼びます．
     }
@@ -95,14 +91,14 @@ document (|
       \code(`attach-boxed-title-on-top-center`);とするとタイトルが中央に配置されます．\code(`attach-boxed-title-on-top-right`);で右側です．
       また\code(`attach-boxed-title-on-bottom-left`);とすると次のように枠の下にタイトルが配置されます．
     }
-    +colorbox [attach-boxed-title-on-bottom-left;] ?:({タイトル}) <+p{中身}>
+    +Colorbox.colorbox [Colorbox.attach-boxed-title-on-bottom-left;] ?:({タイトル}) <+p{中身}>
     +p{
       \code(`attach-boxed-title-on-bottom-center`);および\code(`attach-boxed-title-on-bottom-right`);により枠の下の中央および右側にタイトルが配置されます．
     }
     +p{
       \code(`flip-title`);：下のように枠の下端に通常形式のタイトルが表示されます．
     }
-    +colorbox [flip-title;] ?:({タイトル}) <+p{中身}>
+    +Colorbox.colorbox [Colorbox.flip-title;] ?:({タイトル}) <+p{中身}>
     +p{
       \code(`boxtitle-xshift`);，\code(`boxtitle-yshift`);：どちらもlength型の引数を一つとります．ボックス型タイトルが指定されているときのみ有効です．それぞれ左右方向，上下方向にタイトルの位置を移動します．右および上が正です．
     }
