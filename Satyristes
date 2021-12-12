@@ -4,40 +4,40 @@
 ;; Library declaration
 (library
   ;; Library name
-  (name "satysfi-colorbox")
+  (name "colorbox")
   ;; Library version
-  (version "1.0.0")
+  (version "0.1.0")
   ;; Files
   (sources
     ((packageDir "src")))
   ;; OPAM package file
-  (opam "satysfi-satysfi-colorbox.opam")
+  (opam "satysfi-colorbox.opam")
   ;; Dependency
   (dependencies
     ((dist ()) ; Standard library
      (base ()) ; Base library
+     (fss ());
     )))
 
 ;; Library doc declaration
 (libraryDoc
   ;; Library doc name
-  (name "satysfi-colorbox-doc")
+  (name "colorbox-doc")
   ;; Library version
-  (version "1.0.0")
+  (version "0.1.0")
   ;; Working directory to build docs
   (workingDirectory "doc")
   ;; Build commands
   (build
     ;; Run SATySFi
-    ((satysfi "manual.saty" "-o" "manual.pdf")))
+    ((satysfi "manual-ja.saty" "-o" "manual-ja.pdf")))
   ;; Files
   (sources
-    ((doc "manual.pdf" "doc/manual.pdf")))
+    ((doc "manual-ja.pdf" "doc/manual-ja.pdf")))
   ;; OPAM package file
-  (opam "satysfi-satysfi-colorbox-doc.opam")
+  (opam "satysfi-colorbox-doc.opam")
   ;; Dependency
   (dependencies
-    ((satysfi-colorbox ()) ; the main library
+    ((colorbox ()) ; the main library
      (dist ()) ; Standard library
-     (base ()) ; Base library
     )))
