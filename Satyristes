@@ -40,4 +40,5 @@
   (dependencies
     ((colorbox ()) ; the main library
      (dist ()) ; Standard library
+     (enumitem ())
     )))
