@@ -17,7 +17,6 @@ depends: [
   # You may want to include the corresponding library
   "satysfi-colorbox" {= "%{version}%"}
   "satysfi-dist"
-  
 ]
 build: [
   ["satyrographos" "opam" "build"
