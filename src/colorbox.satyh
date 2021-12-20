@@ -301,27 +301,30 @@ let normal-rule thickness color cfg from to =
   )
 
 let get-stroke-frame-corner-transform from-rule to-rule angle (from-x,from-y) (to-x,to-y) =
-  let (c,s) = (cos (angle *. 3.14159 /. 180.0),sin (angle *. 3.14159 /. 180.0)) in
-  % 原点シフト→-angle回転→(a,b)相似変換→angle変換→(原点シフト)^{-1}
-  % (m11,m_12,m_21,m_22,shift-x,shift-y)，シフトは行列かけた後
-  let make-matrix a b = (
-    (1.0 -. a)*.c*.c +. (1.0 -. b)*.s*.s,
-    (b -. a)*.s*.c,
-    (b -. a)*.s*.c,
-    (1.0 -. a)*.s*.s +. (1.0 -. b)*.c*.c,
-    to-x*'a*.c*.c +' from-x*'b*.s*.s +' to-y*'a*.c*.s -' from-y*'b*.c*.s,
-    to-x*'a*.c*.s -' from-x*'b*.c*.s +' to-y*'a*.s*.s +' from-y*'b*.c*.c
-  ) in
-  let abs l = if Length.(l < 0pt) then (0pt -' l) else l in
-  let from-dist = abs ((from-x -' to-x) *' c +' (from-y -' to-y) *' s) in
-  let to-dist = abs ((from-x -' to-x) *' s -' (from-y -' to-y) *' c) in
-  let from-scale = (from-rule /' from-dist) *. 0.5 in
-  let to-scale = (to-rule /' to-dist) *. 0.5 in
-  let (o11,o12,o21,o22,o-shift-x,o-shift-y) = make-matrix (0.0 -. from-scale) (0.0 -. to-scale) in
-  let (i11,i12,i21,i22,i-shift-x,i-shift-y) = make-matrix from-scale to-scale in
-  let trans-i (xx,yy) = (xx *' i11 +' yy  *' i12 +' i-shift-x,xx *' i21 +' yy *' i22 +' i-shift-y) in
-  let trans-o (xx,yy) = (xx *' o11 +' yy  *' o12 +' o-shift-x,xx *' o21 +' yy *' o22 +' o-shift-y) in
-  (trans-i,trans-o)
+  if Length.(from-x == from-y && to-x == to-y) then
+    (fun p -> p,fun p -> p)
+  else
+    let (c,s) = (cos (angle *. 3.14159 /. 180.0),sin (angle *. 3.14159 /. 180.0)) in
+    % 原点シフト→-angle回転→(a,b)相似変換→angle変換→(原点シフト)^{-1}
+    % (m11,m_12,m_21,m_22,shift-x,shift-y)，シフトは行列かけた後
+    let make-matrix a b = (
+      (1.0 -. a)*.c*.c +. (1.0 -. b)*.s*.s,
+      (b -. a)*.s*.c,
+      (b -. a)*.s*.c,
+      (1.0 -. a)*.s*.s +. (1.0 -. b)*.c*.c,
+      to-x*'a*.c*.c +' from-x*'b*.s*.s +' to-y*'a*.c*.s -' from-y*'b*.c*.s,
+      to-x*'a*.c*.s -' from-x*'b*.c*.s +' to-y*'a*.s*.s +' from-y*'b*.c*.c
+    ) in
+    let abs l = if Length.(l < 0pt) then (0pt -' l) else l in
+    let from-dist = abs ((from-x -' to-x) *' c +' (from-y -' to-y) *' s) in
+    let to-dist = abs ((from-x -' to-x) *' s -' (from-y -' to-y) *' c) in
+    let from-scale = (from-rule /' from-dist) *. 0.5 in
+    let to-scale = (to-rule /' to-dist) *. 0.5 in
+    let (o11,o12,o21,o22,o-shift-x,o-shift-y) = make-matrix (0.0 -. from-scale) (0.0 -. to-scale) in
+    let (i11,i12,i21,i22,i-shift-x,i-shift-y) = make-matrix from-scale to-scale in
+    let trans-i (xx,yy) = (xx *' i11 +' yy  *' i12 +' i-shift-x,xx *' i21 +' yy *' i22 +' i-shift-y) in
+    let trans-o (xx,yy) = (xx *' o11 +' yy  *' o12 +' o-shift-x,xx *' o21 +' yy *' o22 +' o-shift-y) in
+    (trans-i,trans-o)
 
 let circle-frame-corner-path angle radius (x,y) =
   let (c,s) = (cos (angle *. 3.14159 /. 180.0),sin (angle *. 3.14159 /. 180.0)) in
@@ -639,7 +642,7 @@ let make-config option= (|
 let watermark-graphic zoom color txt colbox-config frame ctx index (x,y) width height depth =
   let ib = read-inline (set-text-color color ctx) txt in
   let (w,h,d) = get-natural-metrics ib in
-  if Length.(w == 0pt || (h == 0pt && d == 0pt)) then []
+  if Length.(w == 0pt || (h +' d == 0pt)) then []
   else
     let ratiox = (width *' zoom) /' w in
     let ratioy = ((height +' depth) *' zoom) /' (h +' d) in
