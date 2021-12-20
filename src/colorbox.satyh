@@ -639,14 +639,16 @@ let make-config option= (|
 let watermark-graphic zoom color txt colbox-config frame ctx index (x,y) width height depth =
   let ib = read-inline (set-text-color color ctx) txt in
   let (w,h,d) = get-natural-metrics ib in
-  let ratiox = (width *' zoom) /' w in
-  let ratioy = ((height +' depth) *' zoom) /' (h +' d) in
-  let ratio = if Float.(ratiox < ratioy) then ratiox else ratioy in
-  let txt-x = x +' (width -' (w *' ratio)) *' 0.5 in
-  let txt-y = y +' ((height -' depth) -' ((h -' d) *' ratio)) *' 0.5 in
-  [
-    shift-graphics (txt-x,txt-y) (linear-transform-graphics ratio 0.0 0.0 ratio (draw-text (0pt,0pt) ib))
-  ]
+  if Length.(w == 0pt || (h == 0pt && d == 0pt)) then []
+  else
+    let ratiox = (width *' zoom) /' w in
+    let ratioy = ((height +' depth) *' zoom) /' (h +' d) in
+    let ratio = if Float.(ratiox < ratioy) then ratiox else ratioy in
+    let txt-x = x +' (width -' (w *' ratio)) *' 0.5 in
+    let txt-y = y +' ((height -' depth) -' ((h -' d) *' ratio)) *' 0.5 in
+    [
+      shift-graphics (txt-x,txt-y) (linear-transform-graphics ratio 0.0 0.0 ratio (draw-text (0pt,0pt) ib))
+    ]
 
 let shadow-graphic config colbox-config frame ctx index (x,y) width height depth =
   let (path,_) = make-frame colbox-config frame index 
