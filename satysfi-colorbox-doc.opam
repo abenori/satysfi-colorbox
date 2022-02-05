@@ -1,16 +1,16 @@
 opam-version: "2.0"
 name: "satysfi-colorbox-doc"
-version: "0.1.0"
+version: "0.1.1"
 synopsis: "Document of Colorbox"
 description: """Document of Colorbox package"""
 maintainer: "Noriyuki Abe"
 authors: "Noriyuki Abe"
-license: "BSD-2-Clause-Views"
+license: "MIT"
 homepage: "https://github.com/abenori/satysfi-colorbox"
 dev-repo: "git+https://github.com/abenori/satysfi-colorbox.git"
 bug-reports: "https://github.com/abenori/satysfi-colorbox/issues"
 depends: [
-  "satysfi" { >= "0.0.6" & < "1.0.0" }
+  "satysfi" { >= "0.0.6" & < "0.1.0" }
   "satyrographos" { >= "0.0.2.6" & < "0.0.3" }
   "satysfi-enumitem" {>= "3.0.0" & < "3.1.0" }
 
